@@ -1,0 +1,48 @@
+<project name="commensal-ejml" basedir="." default="jar">
+	<target name="fetch">
+		<copy todir="lib">
+			<fileset dir="../bytecodelib/lib"/>
+		</copy>
+		<copy file="../bytecodelib/build/jar/bytecodelib.jar" todir="lib/"/>
+
+		<get src="http://search.maven.org/remotecontent?filepath=com/googlecode/efficient-java-matrix-library/ejml/0.25/ejml-0.25.jar"
+			 dest="lib/ejml.jar"
+			 skipexisting="true"/>
+		<get src="http://search.maven.org/remotecontent?filepath=com/googlecode/efficient-java-matrix-library/ejml/0.25/ejml-0.25-javadoc.jar"
+			 dest="lib/doc/ejml-doc.jar"
+			 skipexisting="true"/>
+		<get src="http://search.maven.org/remotecontent?filepath=com/googlecode/efficient-java-matrix-library/ejml/0.25/ejml-0.25-sources.jar"
+			 dest="lib/src/ejml-src.jar"
+			 skipexisting="true"/>
+	</target>
+
+	<target name="clean">
+		<delete dir="build"/>
+	</target>
+
+	<target name="compile">
+		<mkdir dir="build/classes"/>
+		<javac srcdir="src" destdir="build/classes" includeantruntime="false">
+			<classpath>
+				<fileset dir="lib">
+					<include name="*.jar"/>
+				</fileset>
+			</classpath>
+		</javac>
+	</target>
+
+	<target name="jar" depends="compile">
+		<mkdir dir="build/jar"/>
+		<jar destfile="build/jar/commensal-ejml.jar" basedir="build/classes">
+<!--			<manifest>
+				<attribute name="Main-Class" value="${main-class}"/>
+			</manifest>-->
+		</jar>
+	</target>
+
+<!--	<target name="run" depends="jar">
+		<java jar="${jar.dir}/${ant.project.name}.jar" fork="true"/>
+	</target>-->
+
+	<target name="clean-build" depends="clean,jar"/>
+</project>
