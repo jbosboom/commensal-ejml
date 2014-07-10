@@ -48,6 +48,7 @@ public final class Compiler {
 	 * holder class.
 	 */
 	private final Map<Value, Field> fieldMap = new HashMap<>();
+	private final Map<Field, Object> knownFieldValues = new HashMap<>();
 	public Compiler() {}
 
 	public <T> T compile(Class<? extends T> c, Object... ctorArgs) {
@@ -56,7 +57,7 @@ public final class Compiler {
 			m.resolve();
 //		k.dump(System.out);
 
-		makeStateHolder(k);
+		makeStateHolder(k, ctorArgs);
 //		stateHolder.dump(System.out);
 
 		for (Method m : k.methods()) {
@@ -66,7 +67,7 @@ public final class Compiler {
 		return null;
 	}
 
-	private void makeStateHolder(Klass k) {
+	private void makeStateHolder(Klass k, Object[] ctorArgs) {
 		TypeFactory types = module.types();
 		stateHolder = new Klass("StateHolder", module.getKlass(Object.class), ImmutableList.<Klass>of(), module);
 		stateHolder.setAccess(Access.PUBLIC);
@@ -107,9 +108,12 @@ public final class Compiler {
 		for (StoreInst oldStore : FluentIterable.from(oldInit.basicBlocks().get(0).instructions()).filter(StoreInst.class)) {
 			Argument source = (Argument)((CallInst)oldStore.getData()).getArgument(0);
 			int argNo = source.getParent().arguments().indexOf(source);
+			Field field = fieldMap.get(oldStore.getLocation());
+			if (field.modifiers().contains(Modifier.FINAL))
+				knownFieldValues.put(field, ctorArgs[argNo-1]);
 
 			CallInst copy = new CallInst(denseMatrixCopy, newInit.arguments().get(argNo));
-			StoreInst newStore = new StoreInst(fieldMap.get(oldStore.getLocation()), copy, newThis);
+			StoreInst newStore = new StoreInst(field, copy, newThis);
 			initBlock.instructions().addAll(ImmutableList.of(copy, newStore));
 		}
 
@@ -124,11 +128,12 @@ public final class Compiler {
 		for (Argument a : m.arguments()) {
 			//TODO: isReceiver
 			if (a.getName().equals("this")) continue;
-			exprs.put(a, new Input(fieldMap.get(a)));
+			Field f = fieldMap.get(a);
+			exprs.put(a, new Input(f, (DenseMatrix64F)knownFieldValues.get(f)));
 		}
 		for (Instruction i : getOnlyElement(m.basicBlocks()).instructions()) {
 			if (i instanceof LoadInst)
-				exprs.put(i, new Input(fieldMap.get(((LoadInst)i).getLocation())));
+				exprs.put(i, new Input(fieldMap.get(((LoadInst)i).getLocation()), null));
 			else if (i instanceof CastInst)
 				exprs.put(i, exprs.get(i.getOperand(0)));
 			else if (i instanceof CallInst) {
@@ -167,6 +172,7 @@ public final class Compiler {
 	}
 
 	public static void main(String[] args) {
-		System.out.println(new Compiler().compile(KalmanFilterSimple.class));
+		System.out.println(new Compiler().compile(KalmanFilterSimple.class,
+				new DenseMatrix64F(9, 9), new DenseMatrix64F(9, 9), new DenseMatrix64F(8, 9)));
 	}
 }
