@@ -13,10 +13,13 @@ public class KalmanFilterSimple implements KalmanFilter {
 	private final SimpleMatrix F, Q, H;
 	// system state estimate (mutated by predict and update)
 	private SimpleMatrix x, P;
-	public KalmanFilterSimple(DenseMatrix64F F, DenseMatrix64F Q, DenseMatrix64F H) {
+	public KalmanFilterSimple(DenseMatrix64F F, DenseMatrix64F Q,
+			DenseMatrix64F H, DenseMatrix64F x, DenseMatrix64F P) {
 		this.F = new SimpleMatrix(F);
         this.Q = new SimpleMatrix(Q);
         this.H = new SimpleMatrix(H);
+		this.x = new SimpleMatrix(x);
+		this.P = new SimpleMatrix(P);
 	}
 
 	@Override

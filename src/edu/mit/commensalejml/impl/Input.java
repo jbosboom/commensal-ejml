@@ -28,6 +28,16 @@ public final class Input extends Expr {
 	}
 
 	@Override
+	public int rows() {
+		return value != null ? value.getNumRows() : -1;
+	}
+
+	@Override
+	public int cols() {
+		return value != null ? value.getNumCols() : -1;
+	}
+
+	@Override
 	public String toString() {
 		return String.format("Input(%s)", field.getName());
 	}

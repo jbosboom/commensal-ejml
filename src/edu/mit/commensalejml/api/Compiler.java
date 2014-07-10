@@ -62,7 +62,12 @@ public final class Compiler {
 
 		for (Method m : k.methods()) {
 			if (m.isConstructor()) continue;
-			buildIR(m);
+			Result result = buildIR(m);
+			System.out.println(m.getName());
+			for (Expr e : result.sets.values())
+				System.out.println(e.rows()+" "+e.cols());
+			if (result.ret != null)
+				System.out.println(result.ret.rows()+" "+result.ret.cols());
 		}
 		return null;
 	}
@@ -77,6 +82,7 @@ public final class Compiler {
 				throw new UnsupportedOperationException(f.toString());
 			Field n = new Field(types.getRegularType(denseMatrix),
 					f.getName(), f.modifiers(), stateHolder);
+			n.modifiers().add(Modifier.FINAL);
 			n.setAccess(Access.PUBLIC);
 			fieldMap.put(f, n);
 		}
@@ -187,6 +193,7 @@ public final class Compiler {
 
 	public static void main(String[] args) {
 		System.out.println(new Compiler().compile(KalmanFilterSimple.class,
-				new DenseMatrix64F(9, 9), new DenseMatrix64F(9, 9), new DenseMatrix64F(8, 9)));
+				new DenseMatrix64F(9, 9), new DenseMatrix64F(9, 9), new DenseMatrix64F(8, 9),
+				new DenseMatrix64F(9, 1), new DenseMatrix64F(9, 9)));
 	}
 }

@@ -19,6 +19,15 @@ public abstract class Expr {
 		return dependencies;
 	}
 
+	/**
+	 * @return the number of rows in this expression's result matrix, or -1 if unknown
+	 */
+	public abstract int rows();
+	/**
+	 * @return the number of columns in this expression's result matrix, or -1 if unknown
+	 */
+	public abstract int cols();
+
 //	@Override
 //	public String toString() {
 //		return getClass().getSimpleName()+Joiner.on(", ");

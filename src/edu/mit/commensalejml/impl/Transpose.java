@@ -9,4 +9,14 @@ public final class Transpose extends Expr {
 	public Transpose(Expr matrix) {
 		super(matrix);
 	}
+
+	@Override
+	public int rows() {
+		return deps().get(0).cols();
+	}
+
+	@Override
+	public int cols() {
+		return deps().get(0).rows();
+	}
 }
