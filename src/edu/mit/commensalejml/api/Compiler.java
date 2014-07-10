@@ -120,7 +120,7 @@ public final class Compiler {
 		initBlock.instructions().add(new ReturnInst(types.getVoidType()));
 	}
 
-	private void buildIR(Method m) {
+	private Result buildIR(Method m) {
 		Map<Value, Expr> exprs = new IdentityHashMap<>();
 		//strictly speaking, multiple blocks okay if all terminators are jump/ret
 		if (m.basicBlocks().size() > 1)
@@ -131,6 +131,9 @@ public final class Compiler {
 			Field f = fieldMap.get(a);
 			exprs.put(a, new Input(f, (DenseMatrix64F)knownFieldValues.get(f)));
 		}
+
+		Map<Field, Expr> sets = new IdentityHashMap<>();
+		Expr ret = null;
 		for (Instruction i : getOnlyElement(m.basicBlocks()).instructions()) {
 			if (i instanceof LoadInst)
 				exprs.put(i, new Input(fieldMap.get(((LoadInst)i).getLocation()), null));
@@ -162,12 +165,22 @@ public final class Compiler {
 					throw new UnsupportedOperationException(op.toString());
 			} else if (i instanceof StoreInst) {
 				Field f = fieldMap.get(((StoreInst)i).getLocation());
-				System.out.println("output "+f.getName()+" = "+exprs.get(((StoreInst)i).getData()));
+				sets.put(f, exprs.get(((StoreInst)i).getData()));
 			} else if (i instanceof ReturnInst) {
 				if (i.getNumOperands() == 0) continue;
-				System.out.println("output ret = "+exprs.get(i.getOperand(0)));
+				ret = exprs.get(i.getOperand(0));
 			} else
 				throw new UnsupportedOperationException(i.toString());
+		}
+		return new Result(sets, ret);
+	}
+
+	private static final class Result {
+		public final Map<Field, Expr> sets;
+		public final Expr ret;
+		Result(Map<Field, Expr> sets, Expr ret) {
+			this.sets = sets;
+			this.ret = ret;
 		}
 	}
 
