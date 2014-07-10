@@ -3,6 +3,13 @@ package edu.mit.commensalejml.api;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import edu.mit.commensalejml.impl.Expr;
+import edu.mit.commensalejml.impl.Input;
+import edu.mit.commensalejml.impl.Invert;
+import edu.mit.commensalejml.impl.Minus;
+import edu.mit.commensalejml.impl.Multiply;
+import edu.mit.commensalejml.impl.Plus;
+import edu.mit.commensalejml.impl.Transpose;
 import edu.mit.streamjit.util.bytecode.Access;
 import edu.mit.streamjit.util.bytecode.Argument;
 import edu.mit.streamjit.util.bytecode.BasicBlock;
@@ -13,12 +20,15 @@ import edu.mit.streamjit.util.bytecode.Modifier;
 import edu.mit.streamjit.util.bytecode.Module;
 import edu.mit.streamjit.util.bytecode.Value;
 import edu.mit.streamjit.util.bytecode.insts.CallInst;
+import edu.mit.streamjit.util.bytecode.insts.CastInst;
 import edu.mit.streamjit.util.bytecode.insts.Instruction;
+import edu.mit.streamjit.util.bytecode.insts.LoadInst;
 import edu.mit.streamjit.util.bytecode.insts.ReturnInst;
 import edu.mit.streamjit.util.bytecode.insts.StoreInst;
 import edu.mit.streamjit.util.bytecode.types.TypeFactory;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import org.ejml.data.DenseMatrix64F;
 import org.ejml.simple.SimpleMatrix;
@@ -44,10 +54,15 @@ public final class Compiler {
 		Klass k = module.getKlass(c);
 		for (Method m : k.methods())
 			m.resolve();
-		k.dump(System.out);
+//		k.dump(System.out);
 
 		makeStateHolder(k);
-		stateHolder.dump(System.out);
+//		stateHolder.dump(System.out);
+
+		for (Method m : k.methods()) {
+			if (m.isConstructor()) continue;
+			buildIR(m);
+		}
 		return null;
 	}
 
@@ -99,6 +114,56 @@ public final class Compiler {
 		}
 
 		initBlock.instructions().add(new ReturnInst(types.getVoidType()));
+	}
+
+	private void buildIR(Method m) {
+		Map<Value, Expr> exprs = new IdentityHashMap<>();
+		//strictly speaking, multiple blocks okay if all terminators are jump/ret
+		if (m.basicBlocks().size() > 1)
+			throw new UnsupportedOperationException(m.getName());
+		for (Argument a : m.arguments()) {
+			//TODO: isReceiver
+			if (a.getName().equals("this")) continue;
+			exprs.put(a, new Input(fieldMap.get(a)));
+		}
+		for (Instruction i : getOnlyElement(m.basicBlocks()).instructions()) {
+			if (i instanceof LoadInst)
+				exprs.put(i, new Input(fieldMap.get(((LoadInst)i).getLocation())));
+			else if (i instanceof CastInst)
+				exprs.put(i, exprs.get(i.getOperand(0)));
+			else if (i instanceof CallInst) {
+				CallInst ci = (CallInst)i;
+				Method op = ci.getMethod();
+				String name = op.getName();
+				if (name.equals("getMatrix") || name.equals("wrap") || name.equals("<init>"))
+					exprs.put(i, exprs.get(ci.getArgument(0)));
+				else if (name.equals("invert"))
+					exprs.put(i, new Invert(exprs.get(ci.getArgument(0))));
+				else if (name.equals("transpose"))
+					exprs.put(i, new Transpose(exprs.get(ci.getArgument(0))));
+				else if (name.equals("plus"))
+					exprs.put(i, new Plus(
+							exprs.get(ci.getArgument(0)),
+							exprs.get(ci.getArgument(1))));
+				else if (name.equals("minus"))
+					exprs.put(i, new Minus(
+							exprs.get(ci.getArgument(0)),
+							exprs.get(ci.getArgument(1))));
+				else if (name.equals("mult"))
+					exprs.put(i, new Multiply(
+							exprs.get(ci.getArgument(0)),
+							exprs.get(ci.getArgument(1))));
+				else
+					throw new UnsupportedOperationException(op.toString());
+			} else if (i instanceof StoreInst) {
+				Field f = fieldMap.get(((StoreInst)i).getLocation());
+				System.out.println("output "+f.getName()+" = "+exprs.get(((StoreInst)i).getData()));
+			} else if (i instanceof ReturnInst) {
+				if (i.getNumOperands() == 0) continue;
+				System.out.println("output ret = "+exprs.get(i.getOperand(0)));
+			} else
+				throw new UnsupportedOperationException(i.toString());
+		}
 	}
 
 	public static void main(String[] args) {
