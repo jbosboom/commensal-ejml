@@ -135,9 +135,10 @@ public final class Compiler {
 		Map<Field, Expr> sets = new IdentityHashMap<>();
 		Expr ret = null;
 		for (Instruction i : getOnlyElement(m.basicBlocks()).instructions()) {
-			if (i instanceof LoadInst)
-				exprs.put(i, new Input(fieldMap.get(((LoadInst)i).getLocation()), null));
-			else if (i instanceof CastInst)
+			if (i instanceof LoadInst) {
+				Field f = fieldMap.get(((LoadInst)i).getLocation());
+				exprs.put(i, new Input(f, (DenseMatrix64F)knownFieldValues.get(f)));
+			} else if (i instanceof CastInst)
 				exprs.put(i, exprs.get(i.getOperand(0)));
 			else if (i instanceof CallInst) {
 				CallInst ci = (CallInst)i;
