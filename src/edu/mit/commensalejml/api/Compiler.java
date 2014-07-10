@@ -64,10 +64,14 @@ public final class Compiler {
 			if (m.isConstructor()) continue;
 			Result result = buildIR(m);
 			System.out.println(m.getName());
-			for (Expr e : result.sets.values())
+			for (Expr e : result.sets.values()) {
+				foldMultiplyTranspose(e);
 				System.out.println(e.rows()+" "+e.cols());
-			if (result.ret != null)
+			}
+			if (result.ret != null) {
+				foldMultiplyTranspose(result.ret);
 				System.out.println(result.ret.rows()+" "+result.ret.cols());
+			}
 		}
 		return null;
 	}
@@ -165,7 +169,7 @@ public final class Compiler {
 							exprs.get(ci.getArgument(0)),
 							exprs.get(ci.getArgument(1))));
 				else if (name.equals("mult"))
-					exprs.put(i, new Multiply(
+					exprs.put(i, Multiply.regular(
 							exprs.get(ci.getArgument(0)),
 							exprs.get(ci.getArgument(1))));
 				else
@@ -189,6 +193,26 @@ public final class Compiler {
 			this.sets = sets;
 			this.ret = ret;
 		}
+	}
+
+	private static void foldMultiplyTranspose(Expr e) {
+		if (e instanceof Multiply) {
+			Multiply m = (Multiply)e;
+			Expr left = m.deps().get(0), right = m.deps().get(1);
+			if (left instanceof Transpose) {
+				System.out.println("folded away left "+left);
+				m.deps().set(0, left.deps().get(0));
+				m.toggleTransposeLeft();
+			}
+			if (right instanceof Transpose) {
+				System.out.println("folded away right "+right);
+				m.deps().set(1, right.deps().get(0));
+				m.toggleTransposeRight();
+			}
+		}
+
+		for (Expr d : e.deps())
+			foldMultiplyTranspose(d);
 	}
 
 	public static void main(String[] args) {
