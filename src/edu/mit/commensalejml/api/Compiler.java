@@ -194,7 +194,7 @@ public final class Compiler {
 				Method op = ci.getMethod();
 				String name = op.getName();
 				if (name.equals("getMatrix") || name.equals("wrap") || name.equals("<init>"))
-					exprs.put(i, exprs.get(ci.getArgument(0)));
+					exprs.put(i, exprs.get(fieldMap.get(ci.getArgument(0))));
 				else if (name.equals("invert"))
 					exprs.put(i, new Invert(exprs.get(ci.getArgument(0))));
 				else if (name.equals("transpose"))
