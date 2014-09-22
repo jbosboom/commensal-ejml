@@ -1,5 +1,11 @@
 package edu.mit.commensalejml.impl;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import java.lang.invoke.MethodHandle;
+import java.util.List;
+import org.ejml.ops.CommonOps;
+
 /**
  *
  * @author Jeffrey Bosboom <jbosboom@csail.mit.edu>
@@ -18,5 +24,11 @@ public final class Transpose extends Expr {
 	@Override
 	public int cols() {
 		return deps().get(0).rows();
+	}
+
+	private static final MethodHandle TRANSPOSE = MethodHandleUtils.lookup(CommonOps.class, "transpose", 2);
+	@Override
+	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
+		return MethodHandleUtils.apply(TRANSPOSE, Iterables.concat(sources, ImmutableList.of(sink)));
 	}
 }

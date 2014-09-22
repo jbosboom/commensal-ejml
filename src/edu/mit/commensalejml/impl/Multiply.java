@@ -1,5 +1,12 @@
 package edu.mit.commensalejml.impl;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import static edu.mit.commensalejml.impl.MethodHandleUtils.lookup;
+import java.lang.invoke.MethodHandle;
+import java.util.List;
+import org.ejml.ops.CommonOps;
+
 /**
  *
  * @author Jeffrey Bosboom <jbosboom@csail.mit.edu>
@@ -56,5 +63,17 @@ public final class Multiply extends Expr {
 	}
 	public void toggleTransposeRight() {
 		setTransposeRight(!isTransposeRight());
+	}
+
+	private static MethodHandle MULT = lookup(CommonOps.class, "mult", 3),
+			MULT_TRANS_L = lookup(CommonOps.class, "multTransA", 3),
+			MULT_TRANS_R = lookup(CommonOps.class, "multTransB", 3),
+			MULT_TRANS_LR = lookup(CommonOps.class, "multTransAB", 3);
+	@Override
+	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
+		MethodHandle handle = isTransposeLeft() ?
+				(isTransposeRight() ? MULT_TRANS_LR : MULT_TRANS_L) :
+				(isTransposeRight() ? MULT_TRANS_R : MULT);
+		return MethodHandleUtils.apply(handle, Iterables.concat(sources, ImmutableList.of(sink)));
 	}
 }

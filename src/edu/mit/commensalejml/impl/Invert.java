@@ -1,5 +1,12 @@
 package edu.mit.commensalejml.impl;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import java.lang.invoke.MethodHandle;
+import java.util.Collections;
+import java.util.List;
+import org.ejml.ops.CommonOps;
+
 /**
  *
  * @author Jeffrey Bosboom <jbosboom@csail.mit.edu>
@@ -18,5 +25,17 @@ public final class Invert extends Expr {
 	@Override
 	public int cols() {
 		return deps().get(0).cols();
+	}
+
+	@Override
+	public List<Expr> inplacePlaces() {
+		return Collections.unmodifiableList(deps());
+	}
+
+	private static final MethodHandle INVERT_ = MethodHandleUtils.lookup(CommonOps.class, "invert", 2),
+			INVERT = INVERT_.asType(INVERT_.type().changeReturnType(void.class));
+	@Override
+	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
+		return MethodHandleUtils.apply(INVERT, Iterables.concat(sources, ImmutableList.of(sink)));
 	}
 }

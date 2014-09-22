@@ -1,6 +1,8 @@
 package edu.mit.commensalejml.impl;
 
 import edu.mit.streamjit.util.bytecode.Field;
+import java.lang.invoke.MethodHandle;
+import java.util.List;
 import org.ejml.data.DenseMatrix64F;
 
 /**
@@ -38,7 +40,12 @@ public final class Input extends Expr {
 	}
 
 	@Override
+	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
+		throw new AssertionError();
+	}
+
+	@Override
 	public String toString() {
-		return String.format("Input(%s)", field.getName());
+		return String.format("Input(%s)@%h", field.getName(), System.identityHashCode(this));
 	}
 }
