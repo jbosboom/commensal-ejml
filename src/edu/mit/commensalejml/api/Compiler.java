@@ -1,5 +1,6 @@
 package edu.mit.commensalejml.api;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashBiMap;
@@ -11,6 +12,7 @@ import com.google.common.collect.SetMultimap;
 import edu.mit.commensalejml.impl.Expr;
 import edu.mit.commensalejml.impl.Input;
 import edu.mit.commensalejml.impl.Invert;
+import edu.mit.commensalejml.impl.MethodHandleUtils;
 import edu.mit.commensalejml.impl.Minus;
 import edu.mit.commensalejml.impl.Multiply;
 import edu.mit.commensalejml.impl.Plus;
@@ -32,11 +34,14 @@ import edu.mit.streamjit.util.bytecode.insts.LoadInst;
 import edu.mit.streamjit.util.bytecode.insts.ReturnInst;
 import edu.mit.streamjit.util.bytecode.insts.StoreInst;
 import edu.mit.streamjit.util.bytecode.types.TypeFactory;
+import edu.mit.streamjit.util.bytecode.types.VoidType;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -46,6 +51,9 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import org.ejml.data.D1Matrix64F;
 import org.ejml.data.DenseMatrix64F;
 import org.ejml.simple.SimpleMatrix;
 
@@ -56,6 +64,8 @@ import org.ejml.simple.SimpleMatrix;
  */
 public final class Compiler {
 	private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
+	//for initializing static fields in newly-spun classes
+	public static final Map<String, MethodHandle> TRAMPOLINE = new ConcurrentHashMap<>();
 	private final Module module = new Module();
 	private final ModuleClassLoader loader = new ModuleClassLoader(module);
 	private final Klass simpleMatrix = module.getKlass(SimpleMatrix.class);
@@ -74,15 +84,18 @@ public final class Compiler {
 	private final Map<Method, Result> methodIR = new HashMap<>();
 	public Compiler() {}
 
-	public <T> T compile(Class<? extends T> c, Object... ctorArgs) {
+	public <T> T compile(Class<T> iface, Class<? extends T> c, Object... ctorArgs) {
+		checkArgument(iface.isInterface(), "%s not an interface", iface);
+		checkArgument(iface.isAssignableFrom(c), "%s does not implement %s", iface, c);
 		Klass k = module.getKlass(c);
 		for (Method m : k.methods())
 			m.resolve();
 //		k.dump(System.out);
 
 		makeStateHolder(k, ctorArgs);
-//		stateHolder.dump(System.out);
+		stateHolderKlass.dump(System.out);
 
+		Map<Method, MethodHandle> impls = new HashMap<>();
 		for (Method m : k.methods()) {
 			if (m.isConstructor()) continue;
 			Result result = buildIR(m);
@@ -97,9 +110,66 @@ public final class Compiler {
 				System.out.println(result.ret.rows()+" "+result.ret.cols());
 //				print(result.ret, 0);
 			}
-			new GreedyCodegen(result).codegen();
+			impls.put(m, new GreedyCodegen(m, result).codegen());
 		}
-		return null;
+
+		Klass impl = new Klass("asdfasdf", module.getKlass(Object.class), k.interfaces(), module);
+		impl.modifiers().add(Modifier.PUBLIC);
+		impl.modifiers().add(Modifier.FINAL);
+		//TODO: no-op default constructors should be a bytecodelib utility method
+		Method init = new Method("<init>",
+				module.types().getMethodType(module.types().getType(impl)),
+				EnumSet.of(Modifier.PUBLIC),
+				impl);
+		BasicBlock initBlock = new BasicBlock(module);
+		init.basicBlocks().add(initBlock);
+		Method objCtor = module.getKlass(Object.class).getMethods("<init>").iterator().next();
+		initBlock.instructions().add(new CallInst(objCtor));
+		initBlock.instructions().add(new ReturnInst(module.types().getVoidType()));
+
+		Method implClinit = new Method("<clinit>", module.types().getMethodType("()V"), EnumSet.of(Modifier.STATIC), impl);
+		BasicBlock clinit = new BasicBlock(module);
+		implClinit.basicBlocks().add(clinit);
+		Field trampoline = module.getKlass(getClass()).getField("TRAMPOLINE");
+		Method mapRemove = module.getKlass(Map.class).getMethod("remove", module.types().getMethodType(Object.class, Map.class, Object.class));
+		Method invokeExact = module.getKlass(MethodHandle.class).getMethod("invokeExact", module.types().getMethodType(Object.class, MethodHandle.class, Object[].class));
+		for (Method m : k.methods()) {
+			if (m.isConstructor()) continue;
+			Field handleField = new Field(module.types().getRegularType(MethodHandle.class), m.getName()+"$impl",
+					EnumSet.of(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL), impl);
+			LoadInst getstatic = new LoadInst(trampoline);
+			String key = m.getName()+UUID.randomUUID().toString();
+			TRAMPOLINE.put(key, impls.get(m));
+			CallInst remove = new CallInst(mapRemove, getstatic, module.constants().getConstant(key));
+			CastInst cast = new CastInst(module.types().getType(MethodHandle.class), remove);
+			StoreInst putstatic = new StoreInst(handleField, cast);
+			clinit.instructions().addAll(Arrays.asList(getstatic, remove, cast, putstatic));
+
+			Method n = new Method(m.getName(),
+					m.getType().dropFirstArgument().prependArgument(module.types().getRegularType(impl)),
+					EnumSet.of(Modifier.PUBLIC, Modifier.FINAL), impl);
+			BasicBlock block = new BasicBlock(module);
+			n.basicBlocks().add(block);
+			LoadInst getHandle = new LoadInst(handleField);
+			Value[] invokeArgs = n.arguments().stream().toArray(Value[]::new);
+			//replace the (unused) this arg with the handle
+			invokeArgs[0] = getHandle;
+			edu.mit.streamjit.util.bytecode.types.MethodType desc = n.getType().dropFirstArgument().prependArgument(module.types().getRegularType(MethodHandle.class));
+			CallInst invoke = new CallInst(invokeExact, desc, invokeArgs);
+			//TODO: allow passing void value to return (just ignore it)
+			ReturnInst ret = invoke.getType() instanceof VoidType ?
+					new ReturnInst(invoke.getType()) :
+					new ReturnInst(invoke.getType(), invoke);
+			block.instructions().addAll(Arrays.asList(getHandle, invoke, ret));
+		}
+		clinit.instructions().add(new ReturnInst(module.types().getVoidType()));
+
+		ModuleClassLoader mcl = new ModuleClassLoader(module);
+		try {
+			return iface.cast(mcl.loadClass(impl.getName()).newInstance());
+		} catch (ClassNotFoundException | InstantiationException | IllegalAccessException ex) {
+			throw new RuntimeException(ex);
+		}
 	}
 
 	private void makeStateHolder(Klass k, Object[] ctorArgs) {
@@ -175,7 +245,9 @@ public final class Compiler {
 			//TODO: isReceiver
 			if (a.getName().equals("this")) continue;
 			Field f = fieldMap.get(a);
-			exprs.put(a, new Input(f, (DenseMatrix64F)knownFieldValues.get(f)));
+			Input input = fieldInputs.computeIfAbsent(f,  f_ ->
+					new Input(f_, (DenseMatrix64F)knownFieldValues.get(f_)));
+			exprs.put(f, input);
 		}
 
 		BiMap<Field, Expr> sets = HashBiMap.create();
@@ -265,6 +337,7 @@ public final class Compiler {
 	}
 
 	private final class GreedyCodegen {
+		private final Method method;
 		private final Result result;
 		//ordered by hotness (hottest first)
 		private final List<Expr> ready = new ArrayList<>();
@@ -272,7 +345,8 @@ public final class Compiler {
 		private final Map<Expr, DenseMatrix64F> allocatedTemps = new HashMap<>();
 		private final List<DenseMatrix64F> tempFreelist = new ArrayList<>();
 		private final SetMultimap<Expr, Expr> remainingUses = HashMultimap.create();
-		GreedyCodegen(Result result) {
+		GreedyCodegen(Method method, Result result) {
+			this.method = method;
 			this.result = result;
 		}
 		public MethodHandle codegen() {
@@ -293,10 +367,32 @@ public final class Compiler {
 				ops.add(next.operate(sources, sink));
 
 				ready.add(0, next);
-				//TODO: expire temps to free list?  what about deferred field sets or ret?
+				for (Expr d : next.deps()) {
+					Set<Expr> uses = remainingUses.get(d);
+					uses.remove(next);
+					if (uses.isEmpty()) {
+						ready.remove(d);
+						//TODO: expire temps to free list, unless needed for
+						//deferred field set or ret?
+					}
+				}
 			}
 
-			return null;
+			for (BiMap.Entry<Field, Expr> s : result.sets.entrySet())
+				ops.add(setField(s));
+			MethodHandle opsHandle = MethodHandleUtils.semicolon(ops);
+
+			MethodHandle withArgs = opsHandle;
+			for (Argument a : FluentIterable.from(method.arguments()).skip(1)) {
+				Field f = fieldMap.get(a);
+				withArgs = MethodHandles.dropArguments(withArgs, withArgs.type().parameterCount(),
+						f.getType().getFieldType().getKlass().getBackingClass());
+				withArgs = MethodHandles.collectArguments(withArgs, withArgs.type().parameterCount()-1,
+						makeFieldSetter(f));
+			}
+
+			return result.ret == null ? withArgs :
+					MethodHandles.filterReturnValue(withArgs, source(result.ret));
 		}
 
 		private void prepare(Expr e) {
@@ -336,11 +432,7 @@ public final class Compiler {
 		private MethodHandle source(Expr e) {
 			//TODO: cache various handles?
 			if (e instanceof Input)
-				try {
-					return LOOKUP.findGetter(stateHolder.getClass(), ((Input)e).getField().getName(), DenseMatrix64F.class).bindTo(stateHolder);
-				} catch (NoSuchFieldException | IllegalAccessException ex) {
-					throw new AssertionError(ex);
-				}
+				return makeFieldGetter(((Input)e).getField());
 			else {
 				assert allocatedTemps.containsKey(e);
 				return MethodHandles.constant(DenseMatrix64F.class, allocatedTemps.get(e));
@@ -353,18 +445,19 @@ public final class Compiler {
 		 * Despite intuition, sinks are getter handles, not setters.
 		 */
 		private MethodHandle sink(Expr e) {
-			//Field outputs should go direct if we don't still need the
-			//corresponding input.
-			//TODO: I guess we'd want some lookahead to see if going direct is
-			//possible early, to set up an inplace operation targeting the output.
-			Field output = result.sets.inverse().get(e);
-			Input input = result.inputs.get(output);
-			if (remainingUses.get(input).isEmpty())
-				return source(input);
-
-			for (Expr i : e.inplacePlaces())
-				if (!(i instanceof Input) && remainingUses.get(i).isEmpty())
-					return source(i);
+//			//Field outputs should go direct if we don't still need the
+//			//corresponding input.
+//			//TODO: I guess we'd want some lookahead to see if going direct is
+//			//possible early, to set up an inplace operation targeting the output.
+//			//TODO: ignore the uses of this operation?  maybe that's just special case of inplace
+//			Field output = result.sets.inverse().get(e);
+//			Input input = result.inputs.get(output);
+//			if (remainingUses.get(input).isEmpty())
+//				return source(input);
+//
+//			for (Expr i : e.inplacePlaces())
+//				if (!(i instanceof Input) && remainingUses.get(i).isEmpty())
+//					return source(i);
 
 			assert e.rows() != -1 && e.cols() != -1;
 			DenseMatrix64F temp = tempFreelist.stream()
@@ -375,10 +468,35 @@ public final class Compiler {
 			allocatedTemps.put(e, temp);
 			return MethodHandles.constant(DenseMatrix64F.class, temp);
 		}
+
+		private final MethodHandle SET_ = MethodHandleUtils.lookup(D1Matrix64F.class, "set", 1),
+				SET = SET_.asType(MethodType.methodType(void.class, DenseMatrix64F.class, DenseMatrix64F.class));
+		private MethodHandle setField(Map.Entry<Field, Expr> s) {
+			MethodHandle source = source(s.getValue());
+			MethodHandle sink = makeFieldGetter(s.getKey());
+			MethodHandle set = MethodHandles.collectArguments(SET, 0, sink);
+			return MethodHandles.collectArguments(set, 0, source);
+		}
+
+		private MethodHandle makeFieldGetter(Field f) {
+			try {
+				return LOOKUP.findGetter(stateHolder.getClass(), f.getName(), DenseMatrix64F.class).bindTo(stateHolder);
+			} catch (NoSuchFieldException | IllegalAccessException ex) {
+				throw new AssertionError(ex);
+			}
+		}
+
+		private MethodHandle makeFieldSetter(Field f) {
+			try {
+				return LOOKUP.findSetter(stateHolder.getClass(), f.getName(), DenseMatrix64F.class).bindTo(stateHolder);
+			} catch (NoSuchFieldException | IllegalAccessException ex) {
+				throw new AssertionError(ex);
+			}
+		}
 	}
 
 	public static void main(String[] args) {
-		System.out.println(new Compiler().compile(KalmanFilterSimple.class,
+		System.out.println(new Compiler().compile(KalmanFilter.class, KalmanFilterSimple.class,
 				new DenseMatrix64F(9, 9), new DenseMatrix64F(9, 9), new DenseMatrix64F(8, 9),
 				new DenseMatrix64F(9, 1), new DenseMatrix64F(9, 9)));
 	}

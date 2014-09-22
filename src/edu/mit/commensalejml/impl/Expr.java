@@ -1,5 +1,6 @@
 package edu.mit.commensalejml.impl;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import com.google.common.collect.ImmutableList;
 import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
@@ -14,7 +15,9 @@ import java.util.List;
 public abstract class Expr {
 	private final List<Expr> dependencies = new ArrayList<>();
 	public Expr(Expr... deps) {
-		deps().addAll(Arrays.asList(deps));
+		List<Expr> list = Arrays.asList(deps);
+		checkArgument(!list.contains(null), list);
+		deps().addAll(list);
 	}
 
 	public final List<Expr> deps() {

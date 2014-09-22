@@ -2,6 +2,7 @@ package edu.mit.commensalejml.impl;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
@@ -13,19 +14,20 @@ import java.util.stream.Collectors;
  * @since 9/21/2014
  */
 public final class MethodHandleUtils {
+	private static final Lookup LOOKUP = MethodHandles.lookup();
 	private MethodHandleUtils() {}
 
-	public static MethodHandle lookup(Class<?> c, String name, int matrixArguments) {
-		List<Method> methods = Arrays.stream(c.getMethods())
+	public static MethodHandle lookup(Class<?> c, String name, int referenceArguments) {
+		List<Method> methods = Arrays.stream(c.getDeclaredMethods())
 				.filter(m -> m.getName().equals(name))
-				.filter(m -> m.getParameterCount() == matrixArguments)
+				.filter(m -> m.getParameterCount() == referenceArguments)
 				//we don't know precisely which type, but all reference types
 				.filter(m -> Arrays.stream(m.getParameterTypes()).allMatch(x -> !x.isPrimitive()))
 				.collect(Collectors.toList());
 		if (methods.size() != 1)
-			throw new RuntimeException(c+" "+name+" "+matrixArguments+": "+methods);
+			throw new RuntimeException(c+" "+name+" "+referenceArguments+": "+methods);
 		try {
-			return MethodHandles.publicLookup().unreflect(methods.get(0));
+			return LOOKUP.unreflect(methods.get(0));
 		} catch (IllegalAccessException ex) {
 			throw new RuntimeException(ex);
 		}
@@ -36,5 +38,14 @@ public final class MethodHandleUtils {
 			handle = MethodHandles.collectArguments(handle, 0,
 					a.asType(a.type().changeReturnType(handle.type().parameterType(0))));
 		return handle;
+	}
+
+	private static void _semicolon(MethodHandle[] handles) throws Throwable {
+		for (MethodHandle h : handles)
+			h.invokeExact();
+	}
+	private static final MethodHandle SEMICOLON = lookup(MethodHandleUtils.class, "_semicolon", 1);
+	public static MethodHandle semicolon(List<MethodHandle> handles) {
+		return SEMICOLON.bindTo(handles.stream().toArray(MethodHandle[]::new));
 	}
 }
