@@ -385,9 +385,7 @@ public final class Compiler {
 			MethodHandle withArgs = opsHandle;
 			for (Argument a : FluentIterable.from(method.arguments()).skip(1)) {
 				Field f = fieldMap.get(a);
-				withArgs = MethodHandles.dropArguments(withArgs, withArgs.type().parameterCount(),
-						f.getType().getFieldType().getKlass().getBackingClass());
-				withArgs = MethodHandles.collectArguments(withArgs, withArgs.type().parameterCount()-1,
+				withArgs = MethodHandles.collectArguments(withArgs, withArgs.type().parameterCount(),
 						makeFieldSetter(f));
 			}
 
