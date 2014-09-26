@@ -6,6 +6,7 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.SetMultimap;
@@ -449,15 +450,19 @@ public final class Compiler {
 //			//corresponding input.
 //			//TODO: I guess we'd want some lookahead to see if going direct is
 //			//possible early, to set up an inplace operation targeting the output.
-//			//TODO: ignore the uses of this operation?  maybe that's just special case of inplace
-//			Field output = result.sets.inverse().get(e);
-//			Input input = result.inputs.get(output);
-//			if (remainingUses.get(input).isEmpty())
-//				return source(input);
+			Field output = result.sets.inverse().get(e);
+			Input input = result.inputs.get(output);
+			if (output != null && remainingUses.get(input).equals(ImmutableSet.of(e))) {
+				//we've set this field, so we don't need to do it after the ops
+				result.sets.remove(output);
+				return source(input);
+			}
 //
-//			for (Expr i : e.inplacePlaces())
-//				if (!(i instanceof Input) && remainingUses.get(i).isEmpty())
-//					return source(i);
+			for (Expr i : e.inplacePlaces())
+				if (remainingUses.get(i).equals(ImmutableSet.of(e)) && allocatedTemps.get(i) != null) {
+					allocatedTemps.put(e, allocatedTemps.get(i));
+					return source(i);
+				}
 
 			assert e.rows() != -1 && e.cols() != -1;
 			DenseMatrix64F temp = tempFreelist.stream()
@@ -466,7 +471,7 @@ public final class Compiler {
 					.orElseGet(() -> new DenseMatrix64F(e.rows(), e.cols()));
 			tempFreelist.remove(temp);
 			allocatedTemps.put(e, temp);
-			return MethodHandles.constant(DenseMatrix64F.class, temp);
+			return source(e);
 		}
 
 		private final MethodHandle SET_ = MethodHandleUtils.lookup(D1Matrix64F.class, "set", 1),
