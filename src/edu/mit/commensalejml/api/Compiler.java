@@ -96,6 +96,7 @@ public final class Compiler {
 		makeStateHolder(k, ctorArgs);
 		stateHolderKlass.dump(System.out);
 
+		List<DenseMatrix64F> tempFreelist = new ArrayList<>();
 		Map<Method, MethodHandle> impls = new HashMap<>();
 		for (Method m : k.methods()) {
 			if (m.isConstructor()) continue;
@@ -111,7 +112,7 @@ public final class Compiler {
 				System.out.println(result.ret.rows()+" "+result.ret.cols());
 //				print(result.ret, 0);
 			}
-			impls.put(m, new GreedyCodegen(m, result).codegen());
+			impls.put(m, new GreedyCodegen(m, result, tempFreelist).codegen());
 		}
 
 		Klass impl = new Klass("asdfasdf", module.getKlass(Object.class), k.interfaces(), module);
@@ -344,11 +345,12 @@ public final class Compiler {
 		private final List<Expr> ready = new ArrayList<>();
 		private final Set<Expr> unready = new HashSet<>();
 		private final Map<Expr, DenseMatrix64F> allocatedTemps = new HashMap<>();
-		private final List<DenseMatrix64F> tempFreelist = new ArrayList<>();
+		private final List<DenseMatrix64F> tempFreelist;
 		private final SetMultimap<Expr, Expr> remainingUses = HashMultimap.create();
-		GreedyCodegen(Method method, Result result) {
+		GreedyCodegen(Method method, Result result, List<DenseMatrix64F> tempFreelist) {
 			this.method = method;
 			this.result = result;
+			this.tempFreelist = tempFreelist;
 		}
 		public MethodHandle codegen() {
 			for (Expr e : result.sets.values())
