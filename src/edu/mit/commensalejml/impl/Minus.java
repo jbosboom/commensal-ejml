@@ -32,8 +32,11 @@ public final class Minus extends Expr {
 	}
 
 	private static final MethodHandle SUB = MethodHandleUtils.lookup(CommonOps.class, "sub", 3);
+	private static final MethodHandle SUB_EQUALS = MethodHandleUtils.lookup(CommonOps.class, "subEquals", 2);
 	@Override
 	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
+		if (sources.get(0) == sink)
+			return MethodHandleUtils.apply(SUB_EQUALS, sources.get(0), sources.get(1));
 		return MethodHandleUtils.apply(SUB, Iterables.concat(sources, ImmutableList.of(sink)));
 	}
 }

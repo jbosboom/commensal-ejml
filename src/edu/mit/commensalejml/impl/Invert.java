@@ -33,9 +33,13 @@ public final class Invert extends Expr {
 	}
 
 	private static final MethodHandle INVERT_ = MethodHandleUtils.lookup(CommonOps.class, "invert", 2),
-			INVERT = INVERT_.asType(INVERT_.type().changeReturnType(void.class));
+			INVERT = INVERT_.asType(INVERT_.type().changeReturnType(void.class)),
+			INVERT_INPLACE_ = MethodHandleUtils.lookup(CommonOps.class, "invert", 1),
+			INVERT_INPLACE = INVERT_INPLACE_.asType(INVERT_INPLACE_.type().changeReturnType(void.class));
 	@Override
 	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
+		if (sources.get(0) == sink)
+			return MethodHandleUtils.apply(INVERT_INPLACE, sink);
 		return MethodHandleUtils.apply(INVERT, Iterables.concat(sources, ImmutableList.of(sink)));
 	}
 }

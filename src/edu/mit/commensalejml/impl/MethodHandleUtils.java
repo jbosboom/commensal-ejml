@@ -40,6 +40,13 @@ public final class MethodHandleUtils {
 		return handle;
 	}
 
+	public static MethodHandle apply(MethodHandle handle, MethodHandle... args) {
+		for (MethodHandle a : args)
+			handle = MethodHandles.collectArguments(handle, 0,
+					a.asType(a.type().changeReturnType(handle.type().parameterType(0))));
+		return handle;
+	}
+
 	private static void _semicolon(MethodHandle[] handles) throws Throwable {
 		for (MethodHandle h : handles)
 			h.invokeExact();

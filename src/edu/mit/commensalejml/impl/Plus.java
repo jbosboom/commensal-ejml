@@ -34,8 +34,13 @@ public final class Plus extends Expr {
 	}
 
 	private static final MethodHandle ADD = MethodHandleUtils.lookup(CommonOps.class, "add", 3);
+	private static final MethodHandle ADD_EQUALS = MethodHandleUtils.lookup(CommonOps.class, "addEquals", 2);
 	@Override
 	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
+		if (sources.get(0) == sink)
+			return MethodHandleUtils.apply(ADD_EQUALS, sources.get(0), sources.get(1));
+		else if (sources.get(1) == sink)
+			return MethodHandleUtils.apply(ADD_EQUALS, sources.get(1), sources.get(0));
 		return MethodHandleUtils.apply(ADD, Iterables.concat(sources, ImmutableList.of(sink)));
 	}
 }

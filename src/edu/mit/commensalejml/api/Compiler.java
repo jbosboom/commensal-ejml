@@ -427,13 +427,15 @@ public final class Compiler {
 			return possibleNext.get(0);
 		}
 
+		private final Map<Field, MethodHandle> fieldSetterCache = new IdentityHashMap<>();
+		private final Map<DenseMatrix64F, MethodHandle> constantCache = new IdentityHashMap<>();
 		private MethodHandle source(Expr e) {
-			//TODO: cache various handles?
 			if (e instanceof Input)
-				return makeFieldGetter(((Input)e).getField());
+				return fieldSetterCache.computeIfAbsent(((Input)e).getField(), this::makeFieldGetter);
 			else {
-				assert allocatedTemps.containsKey(e);
-				return MethodHandles.constant(DenseMatrix64F.class, allocatedTemps.get(e));
+				DenseMatrix64F t = allocatedTemps.get(e);
+				assert t != null : e;
+				return constantCache.computeIfAbsent(t, t_ -> MethodHandles.constant(DenseMatrix64F.class, t_));
 			}
 		}
 
