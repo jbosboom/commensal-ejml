@@ -373,14 +373,16 @@ public final class Compiler {
 					uses.remove(next);
 					if (uses.isEmpty()) {
 						ready.remove(d);
-						//TODO: expire temps to free list, unless needed for
-						//deferred field set or ret?
+						//expire temps unless needed for deferred field set or ret
+						if (allocatedTemps.containsKey(d) && !d.equals(result.ret) && !result.sets.containsValue(d))
+							tempFreelist.add(0, allocatedTemps.remove(d));
 					}
 				}
 			}
 
 			for (BiMap.Entry<Field, Expr> s : result.sets.entrySet())
 				ops.add(setField(s));
+			tempFreelist.addAll(0, allocatedTemps.values());
 			MethodHandle opsHandle = MethodHandleUtils.semicolon(ops);
 
 			MethodHandle withArgs = opsHandle;
