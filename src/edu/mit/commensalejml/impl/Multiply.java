@@ -38,12 +38,12 @@ public final class Multiply extends Expr {
 
 	@Override
 	public int rows() {
-		return transposeLeft ? deps().get(0).rows() : deps().get(0).cols();
+		return transposeLeft ? deps().get(0).cols() : deps().get(0).rows();
 	}
 
 	@Override
 	public int cols() {
-		return transposeRight ? deps().get(1).cols() : deps().get(1).rows();
+		return transposeRight ? deps().get(1).rows() : deps().get(1).cols();
 	}
 
 	public boolean isTransposeLeft() {
