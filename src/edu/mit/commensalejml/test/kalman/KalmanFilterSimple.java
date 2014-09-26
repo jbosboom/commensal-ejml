@@ -1,4 +1,4 @@
-package edu.mit.commensalejml.api;
+package edu.mit.commensalejml.test.kalman;
 
 import org.ejml.data.DenseMatrix64F;
 import org.ejml.simple.SimpleMatrix;
