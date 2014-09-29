@@ -62,6 +62,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 import org.ejml.data.D1Matrix64F;
 import org.ejml.data.DenseMatrix64F;
 import org.ejml.simple.SimpleMatrix;
@@ -110,16 +111,7 @@ public final class Compiler {
 			if (m.isConstructor()) continue;
 			Result result = buildIR(m);
 			System.out.println(m.getName());
-			for (Expr e : result.sets.values()) {
-				foldMultiplyTranspose(e);
-				System.out.println(e.rows()+" "+e.cols());
-//				print(e, 0);
-			}
-			if (result.ret != null) {
-				foldMultiplyTranspose(result.ret);
-				System.out.println(result.ret.rows()+" "+result.ret.cols());
-//				print(result.ret, 0);
-			}
+			result.roots().forEachOrdered(Compiler::foldMultiplyTranspose);
 			impls.put(m, new GreedyCodegen(m, result, tempFreelist).codegen());
 		}
 
@@ -316,6 +308,9 @@ public final class Compiler {
 			this.sets = sets;
 			this.ret = ret;
 		}
+		public Stream<Expr> roots() {
+			return Stream.concat(sets.values().stream(), ret != null ? Stream.of(ret) : Stream.empty()).distinct();
+		}
 		public void dump(String filename) {
 			try (BufferedWriter w = new BufferedWriter(new FileWriter(filename))) {
 				w.write("strict digraph {");
@@ -390,10 +385,7 @@ public final class Compiler {
 			this.tempFreelist = tempFreelist;
 		}
 		public MethodHandle codegen() {
-			for (Expr e : result.sets.values())
-				prepare(e);
-			if (result.ret != null)
-				prepare(result.ret);
+			result.roots().forEachOrdered(this::prepare);
 
 			List<MethodHandle> ops = new ArrayList<>();
 			while (!unready.isEmpty()) {
