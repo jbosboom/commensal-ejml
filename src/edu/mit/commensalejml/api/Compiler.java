@@ -38,15 +38,21 @@ import edu.mit.streamjit.util.bytecode.insts.ReturnInst;
 import edu.mit.streamjit.util.bytecode.insts.StoreInst;
 import edu.mit.streamjit.util.bytecode.types.TypeFactory;
 import edu.mit.streamjit.util.bytecode.types.VoidType;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -309,6 +315,35 @@ public final class Compiler {
 			this.inputs = inputs;
 			this.sets = sets;
 			this.ret = ret;
+		}
+		public void dump(String filename) {
+			try (BufferedWriter w = new BufferedWriter(new FileWriter(filename))) {
+				w.write("strict digraph {");
+				Deque<Expr> worklist = new ArrayDeque<>();
+				for (Field f : sets.keySet()) {
+					w.write(q(f.getName())+" [shape=box];\n");
+					w.write(q(sets.get(f).toString()) + " -> " + q(f.getName())+";\n");
+					worklist.add(sets.get(f));
+				}
+				if (ret != null) {
+					w.write(q("return")+" [shape=box];\n");
+					w.write(q(ret.toString()) + " -> " + q("return")+";\n");
+					worklist.add(ret);
+				}
+				while (!worklist.isEmpty()) {
+					Expr e = worklist.pop();
+					for (Expr d : e.deps()) {
+						w.write(q(d.toString()) + " -> " + q(e.toString())+";\n");
+						worklist.add(d);
+					}
+				}
+				w.write("}");
+			} catch (IOException ex) {
+				throw new UncheckedIOException(ex);
+			}
+		}
+		private static String q(String s) {
+			return "\"" + s + "\"";
 		}
 	}
 

@@ -48,8 +48,8 @@ public abstract class Expr {
 
 	public abstract MethodHandle operate(List<MethodHandle> sources, MethodHandle sink);
 
-//	@Override
-//	public String toString() {
-//		return getClass().getSimpleName()+Joiner.on(", ");
-//	}
+	@Override
+	public String toString() {
+		return getClass().getSimpleName()+"@"+Integer.toHexString(hashCode());
+	}
 }
