@@ -3,18 +3,24 @@ package edu.mit.commensalejml.api;
 import edu.mit.commensalejml.test.kalman.KalmanFilter;
 import edu.mit.commensalejml.test.kalman.KalmanFilterSimple;
 import static com.google.common.base.Preconditions.checkArgument;
+import com.google.common.base.Throwables;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Multiset;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.SetMultimap;
 import edu.mit.commensalejml.impl.Expr;
 import edu.mit.commensalejml.impl.Input;
 import edu.mit.commensalejml.impl.Invert;
+import edu.mit.commensalejml.impl.MatrixDimension;
 import edu.mit.commensalejml.impl.MethodHandleUtils;
 import edu.mit.commensalejml.impl.Minus;
 import edu.mit.commensalejml.impl.Multiply;
@@ -57,6 +63,9 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -105,7 +114,7 @@ public final class Compiler {
 		makeStateHolder(k, ctorArgs);
 		stateHolderKlass.dump(System.out);
 
-		List<DenseMatrix64F> tempFreelist = new ArrayList<>();
+		Map<MatrixDimension, Deque<MethodHandle>> tempFreelist = new LinkedHashMap<>();
 		Map<Method, MethodHandle> impls = new HashMap<>();
 		for (Method m : k.methods()) {
 			if (m.isConstructor()) continue;
@@ -373,13 +382,15 @@ public final class Compiler {
 	private final class GreedyCodegen {
 		private final Method method;
 		private final Result result;
-		//ordered by hotness (hottest first)
-		private final List<Expr> ready = new ArrayList<>();
-		private final Set<Expr> unready = new HashSet<>();
-		private final Map<Expr, DenseMatrix64F> allocatedTemps = new HashMap<>();
-		private final List<DenseMatrix64F> tempFreelist;
+		private final Map<Expr, MethodHandle> ready = new LinkedHashMap<>();
+		private final Set<Expr> worklist = new LinkedHashSet<>();
+		//the number of "leases" on temporary matrices
+		private final Multiset<MethodHandle> allocatedTemps = HashMultiset.create();
+		private final Map<MatrixDimension, Deque<MethodHandle>> tempFreelist;
 		private final SetMultimap<Expr, Expr> remainingUses = HashMultimap.create();
-		GreedyCodegen(Method method, Result result, List<DenseMatrix64F> tempFreelist) {
+		private final Map<Input, MethodHandle> deferredFieldSets = new LinkedHashMap<>();
+		private MethodHandle deferredRet = null;
+		GreedyCodegen(Method method, Result result, Map<MatrixDimension, Deque<MethodHandle>> tempFreelist) {
 			this.method = method;
 			this.result = result;
 			this.tempFreelist = tempFreelist;
@@ -388,89 +399,108 @@ public final class Compiler {
 			result.roots().forEachOrdered(this::prepare);
 
 			List<MethodHandle> ops = new ArrayList<>();
-			while (!unready.isEmpty()) {
-				Expr next = findNext();
-				unready.remove(next);
+			while (!worklist.isEmpty()) {
+				Expr next = popNext();
 
 				List<MethodHandle> sources = new ArrayList<>();
 				for (Expr d : next.deps())
 					sources.add(source(d));
+				//inplace sources are now free
+				next.inplacePlaces().stream().forEachOrdered(d -> remainingUses.get(d).remove(next));
+				next.inplacePlaces().stream().distinct().forEachOrdered(this::tryFree);
+
 				MethodHandle sink = sink(next);
 				ops.add(next.operate(sources, sink));
+				ready.put(next, sink);
 
-				ready.add(0, next);
-				for (Expr d : next.deps()) {
-					Set<Expr> uses = remainingUses.get(d);
-					uses.remove(next);
-					if (uses.isEmpty()) {
-						ready.remove(d);
-						//expire temps unless needed for deferred field set or ret
-						if (allocatedTemps.containsKey(d) && !d.equals(result.ret) && !result.sets.containsValue(d))
-							tempFreelist.add(0, allocatedTemps.remove(d));
-					}
+				//If this expression sets a field and we didn't allocate it as a
+				//sink, we have to set it later.  (We'll process deferred sets
+				//after each expr, so we might do it immediately.)
+				Field destField = result.sets.inverse().get(next);
+				if (destField != null && sink != makeFieldGetter(destField)) {
+					Input destInput = result.inputs.get(destField);
+					deferredFieldSets.put(destInput, sink);
+					//take another temp lease
+					if (allocatedTemps.contains(sink))
+						allocatedTemps.add(sink);
+					//Field sets aren't considered uses, so we can free it now.
+					tryFree(next);
 				}
-			}
+				//If this is the return value, it's live until method end.
+				if (result.ret == next) {
+					deferredRet = sink;
+					//take another temp lease
+					if (allocatedTemps.contains(sink))
+						allocatedTemps.add(sink);
+					//Returns aren't considered uses, so we can free it now.
+					tryFree(next);
+				}
 
-			for (BiMap.Entry<Field, Expr> s : result.sets.entrySet())
-				ops.add(setField(s));
-			tempFreelist.addAll(0, allocatedTemps.values());
+				//non-inplace sources are now free
+				next.deps().stream().filter(d -> !next.inplacePlaces().contains(d))
+						.forEachOrdered(d -> remainingUses.get(d).remove(next));
+				next.deps().stream().filter(d -> !next.inplacePlaces().contains(d))
+						.distinct().forEachOrdered(this::tryFree);
+
+				ops.addAll(undeferSets());
+			}
+			assert deferredFieldSets.isEmpty() : deferredFieldSets;
 			MethodHandle opsHandle = MethodHandleUtils.semicolon(ops);
 
 			MethodHandle withArgs = opsHandle;
 			for (Argument a : FluentIterable.from(method.arguments()).skip(1)) {
 				Field f = fieldMap.get(a);
-				withArgs = MethodHandles.collectArguments(withArgs, withArgs.type().parameterCount(),
-						makeFieldSetter(f));
+				withArgs = MethodHandles.collectArguments(withArgs, withArgs.type().parameterCount(), makeFieldSetter(f));
 			}
 
-			return result.ret == null ? withArgs :
-					MethodHandles.filterReturnValue(withArgs, source(result.ret));
+			if (deferredRet != null) {
+				withArgs = MethodHandles.filterReturnValue(withArgs, deferredRet);
+				tryExpireTemp(deferredRet);
+			}
+			assert allocatedTemps.isEmpty() : allocatedTemps;
+			return withArgs;
 		}
 
 		private void prepare(Expr e) {
 			if (e instanceof Input) {
-				if (!ready.contains(e))
-					ready.add(e);
+				if (!ready.containsKey(e))
+					ready.put(e, makeFieldGetter(((Input)e).getField()));
 			} else
-				unready.add(e);
+				worklist.add(e);
 			for (Expr d : e.deps())
 				remainingUses.put(d, e);
 			for (Expr d : e.deps())
 				prepare(d);
 		}
 
-		private Expr findNext() {
-			List<Expr> possibleNext = new ArrayList<>();
-			for (Expr e : unready)
-				if (ready.containsAll(e.deps()))
-					possibleNext.add(e);
-			Collections.sort(possibleNext, new Comparator<Expr>() {
-				@Override
-				public int compare(Expr left, Expr right) {
-					List<Integer> leftDepsRank = new ArrayList<>(),
-							rightDepsRank = new ArrayList<>();
-					for (Expr e : left.deps())
-						leftDepsRank.add(ready.indexOf(e));
-					for (Expr e : right.deps())
-						rightDepsRank.add(ready.indexOf(e));
-					Collections.sort(leftDepsRank);
-					Collections.sort(rightDepsRank);
-					return Ordering.<Integer>natural().lexicographical().compare(leftDepsRank, rightDepsRank);
+		private Expr popNext() {
+//			List<Expr> possibleNext = new ArrayList<>();
+			for (Expr e : worklist)
+				if (ready.keySet().containsAll(e.deps())) {
+					worklist.remove(e);
+					return e;
 				}
-			});
-			return possibleNext.get(0);
+			throw new AssertionError("nothing with all deps ready");
+//					possibleNext.add(e);
+//			Collections.sort(possibleNext, new Comparator<Expr>() {
+//				@Override
+//				public int compare(Expr left, Expr right) {
+//					List<Integer> leftDepsRank = new ArrayList<>(),
+//							rightDepsRank = new ArrayList<>();
+//					for (Expr e : left.deps())
+//						leftDepsRank.add(ready.indexOf(e));
+//					for (Expr e : right.deps())
+//						rightDepsRank.add(ready.indexOf(e));
+//					Collections.sort(leftDepsRank);
+//					Collections.sort(rightDepsRank);
+//					return Ordering.<Integer>natural().lexicographical().compare(leftDepsRank, rightDepsRank);
+//				}
+//			});
+//			return possibleNext.get(0);
 		}
 
-		private final Map<Field, MethodHandle> fieldSetterCache = new IdentityHashMap<>();
-		private final Map<DenseMatrix64F, MethodHandle> constantCache = new IdentityHashMap<>();
 		private MethodHandle source(Expr e) {
-			if (e instanceof Input)
-				return fieldSetterCache.computeIfAbsent(((Input)e).getField(), this::makeFieldGetter);
-			else {
-				DenseMatrix64F t = allocatedTemps.get(e);
-				assert t != null : e;
-				return constantCache.computeIfAbsent(t, t_ -> MethodHandles.constant(DenseMatrix64F.class, t_));
-			}
+			return ready.computeIfAbsent(e, x -> {throw new AssertionError(e+" is not ready");});
 		}
 
 		/**
@@ -485,43 +515,74 @@ public final class Compiler {
 //			//possible early, to set up an inplace operation targeting the output.
 			Field output = result.sets.inverse().get(e);
 			Input input = result.inputs.get(output);
-			if (output != null && remainingUses.get(input).equals(ImmutableSet.of(e))) {
-				//we've set this field, so we don't need to do it after the ops
-				result.sets.remove(output);
-				return source(input);
-			}
-//
-			for (Expr i : e.inplacePlaces())
-				if (remainingUses.get(i).equals(ImmutableSet.of(e)) && allocatedTemps.get(i) != null) {
-					allocatedTemps.put(e, allocatedTemps.get(i));
-					return source(i);
-				}
+			if (output != null && remainingUses.get(input).isEmpty())
+				return makeFieldGetter(input.getField());
 
 			assert e.rows() != -1 && e.cols() != -1;
-			DenseMatrix64F temp = tempFreelist.stream()
-					.filter(m -> m.getNumRows() == e.rows() && m.getNumCols() == e.cols())
-					.findFirst()
-					.orElseGet(() -> new DenseMatrix64F(e.rows(), e.cols()));
-			tempFreelist.remove(temp);
-			allocatedTemps.put(e, temp);
-			return source(e);
+			Deque<MethodHandle> freelist = tempFreelist.computeIfAbsent(
+					new MatrixDimension(e.rows(), e.cols()), d -> new ArrayDeque<>());
+			if (freelist.isEmpty())
+				freelist.push(MethodHandles.constant(DenseMatrix64F.class, new DenseMatrix64F(e.rows(), e.cols())));
+			MethodHandle temp = freelist.pop();
+			assert !allocatedTemps.contains(temp) : "free list contained temp already allocated";
+			allocatedTemps.add(temp);
+			return temp;
+		}
+
+		private void tryFree(Expr e) {
+			MethodHandle loc = ready.get(e);
+			//We took another lease on deferred field sets or ret so we don't
+			//need to check that here; we can still unready it.
+			if (remainingUses.get(e).isEmpty()) {
+				ready.remove(e);
+				tryExpireTemp(loc);
+			}
+		}
+
+		private void tryExpireTemp(MethodHandle loc) {
+			//if loc is a temp and we expired its last lease
+			if (allocatedTemps.remove(loc) && !allocatedTemps.contains(loc))
+				try {
+					tempFreelist.get(new MatrixDimension((DenseMatrix64F)loc.invokeExact())).push(loc);
+				} catch (Throwable ex) {
+					throw Throwables.propagate(ex);
+				}
+		}
+
+		private List<MethodHandle> undeferSets() {
+			List<MethodHandle> setOps = new ArrayList<>();
+			for (Iterator<Map.Entry<Input, MethodHandle>> i = deferredFieldSets.entrySet().iterator(); i.hasNext();) {
+				Map.Entry<Input, MethodHandle> entry = i.next();
+				Input input = entry.getKey();
+				MethodHandle temp = entry.getValue();
+				if (remainingUses.get(input).isEmpty()) {
+					setOps.add(setField(input.getField(), temp));
+					tryExpireTemp(temp);
+					i.remove();
+				}
+			}
+			return setOps;
 		}
 
 		private final MethodHandle SET_ = MethodHandleUtils.lookup(D1Matrix64F.class, "set", 1),
 				SET = SET_.asType(MethodType.methodType(void.class, DenseMatrix64F.class, DenseMatrix64F.class));
-		private MethodHandle setField(Map.Entry<Field, Expr> s) {
-			MethodHandle source = source(s.getValue());
-			MethodHandle sink = makeFieldGetter(s.getKey());
+		private MethodHandle setField(Field field, MethodHandle source) {
+			MethodHandle sink = makeFieldGetter(field);
 			MethodHandle set = MethodHandles.collectArguments(SET, 0, sink);
 			return MethodHandles.collectArguments(set, 0, source);
 		}
 
+		private final Map<Field, MethodHandle> fieldGetterCache = new IdentityHashMap<>();
 		private MethodHandle makeFieldGetter(Field f) {
-			try {
-				return LOOKUP.findGetter(stateHolder.getClass(), f.getName(), DenseMatrix64F.class).bindTo(stateHolder);
-			} catch (NoSuchFieldException | IllegalAccessException ex) {
-				throw new AssertionError(ex);
-			}
+			//TODO: if we know the Input's matrix (i.e., not an arg), should we
+			//make a constant handle instead?
+			return fieldGetterCache.computeIfAbsent(f, f_ -> {
+				try {
+					return LOOKUP.findGetter(stateHolder.getClass(), f_.getName(), DenseMatrix64F.class).bindTo(stateHolder);
+				} catch (NoSuchFieldException | IllegalAccessException ex) {
+					throw new AssertionError(ex);
+				}
+			});
 		}
 
 		private MethodHandle makeFieldSetter(Field f) {
