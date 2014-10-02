@@ -78,8 +78,7 @@ public class KalmanFilterOperations implements KalmanFilter {
 		// P = F P F' + Q
 		mult(F, P, b);
 		multTransB(b, F, P);
-//		addEquals(P, Q);
-		add(P, Q, P);
+		addEquals(P, Q);
 	}
 
 	@Override
@@ -90,8 +89,7 @@ public class KalmanFilterOperations implements KalmanFilter {
 		// S = H P H' + R
 		mult(H, P, c);
 		multTransB(c, H, S);
-//		addEquals(S, R);
-		add(S, R, S);
+		addEquals(S, R);
 		// K = PH'S^(-1)
 		//this is problem-specific knowledge, stay general for fair comparison
 //		if (!solver.setA(S))
@@ -102,13 +100,11 @@ public class KalmanFilterOperations implements KalmanFilter {
 		mult(P, d, K);
 		// x = x + Ky
 		mult(K, y, a);
-//		addEquals(x, a);
-		add(x, a, x);
+		addEquals(x, a);
 		// P = (I-kH)P = P - (KH)P = P-K(HP)
 		mult(H, P, c);
 		mult(K, c, b);
-//		subEquals(P, b);
-		sub(P, b, P);
+		subEquals(P, b);
 	}
 
 	@Override
