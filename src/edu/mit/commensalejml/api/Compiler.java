@@ -97,10 +97,6 @@ public final class Compiler {
 	 */
 	private final Map<Value, Field> fieldMap = new HashMap<>();
 	private final Map<Field, Object> knownFieldValues = new HashMap<>();
-	/**
-	 * Maps methods in the original class to the corresponding IR.
-	 */
-	private final Map<Method, Result> methodIR = new HashMap<>();
 	public Compiler() {}
 
 	public <T> T compile(Class<T> iface, Class<? extends T> c, Object... ctorArgs) {
