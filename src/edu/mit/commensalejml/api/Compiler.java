@@ -24,6 +24,7 @@ import edu.mit.streamjit.util.bytecode.BasicBlock;
 import edu.mit.streamjit.util.bytecode.Field;
 import edu.mit.streamjit.util.bytecode.Klass;
 import edu.mit.streamjit.util.bytecode.Method;
+import edu.mit.streamjit.util.bytecode.Methods;
 import edu.mit.streamjit.util.bytecode.Modifier;
 import edu.mit.streamjit.util.bytecode.Module;
 import edu.mit.streamjit.util.bytecode.ModuleClassLoader;
@@ -249,16 +250,7 @@ public final class Compiler {
 		Klass impl = new Klass("asdfasdf", module.getKlass(Object.class), k.interfaces(), module);
 		impl.modifiers().add(Modifier.PUBLIC);
 		impl.modifiers().add(Modifier.FINAL);
-		//TODO: no-op default constructors should be a bytecodelib utility method
-		Method init = new Method("<init>",
-				module.types().getMethodType(module.types().getType(impl)),
-				EnumSet.of(Modifier.PUBLIC),
-				impl);
-		BasicBlock initBlock = new BasicBlock(module);
-		init.basicBlocks().add(initBlock);
-		Method objCtor = module.getKlass(Object.class).getMethods("<init>").iterator().next();
-		initBlock.instructions().add(new CallInst(objCtor));
-		initBlock.instructions().add(new ReturnInst(module.types().getVoidType()));
+		Methods.createDefaultConstructor(impl);
 		Method implClinit = new Method("<clinit>", module.types().getMethodType("()V"), EnumSet.of(Modifier.STATIC), impl);
 		BasicBlock clinit = new BasicBlock(module);
 		implClinit.basicBlocks().add(clinit);
