@@ -109,8 +109,7 @@ public final class Compiler {
 		for (Method m : k.methods()) {
 			if (m.isConstructor()) continue;
 			for (Argument a : m.arguments()) {
-				//TODO: should be "isReceiver"
-				if (a.getName().equals("this")) continue;
+				if (a.isReceiver()) continue;
 				if (a.getType().getKlass() != denseMatrix)
 					throw new UnsupportedOperationException(a.getType()+" "+a.toString());
 				Field n = new Field(types.getRegularType(denseMatrix),
@@ -174,8 +173,7 @@ public final class Compiler {
 		if (m.basicBlocks().size() > 1)
 			throw new UnsupportedOperationException(m.getName());
 		for (Argument a : m.arguments()) {
-			//TODO: isReceiver
-			if (a.getName().equals("this")) continue;
+			if (a.isReceiver()) continue;
 			Field f = fieldMap.get(a);
 			Input input = fieldInputs.computeIfAbsent(f,  f_ ->
 					new Input(f_, (DenseMatrix64F)knownFieldValues.get(f_)));
