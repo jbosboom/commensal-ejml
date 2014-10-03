@@ -121,56 +121,7 @@ public final class Compiler {
 			impls.put(m, new GreedyCodegen(stateHolder, fieldMap, m, result, tempFreelist).codegen());
 		}
 
-		Klass impl = new Klass("asdfasdf", module.getKlass(Object.class), k.interfaces(), module);
-		impl.modifiers().add(Modifier.PUBLIC);
-		impl.modifiers().add(Modifier.FINAL);
-		//TODO: no-op default constructors should be a bytecodelib utility method
-		Method init = new Method("<init>",
-				module.types().getMethodType(module.types().getType(impl)),
-				EnumSet.of(Modifier.PUBLIC),
-				impl);
-		BasicBlock initBlock = new BasicBlock(module);
-		init.basicBlocks().add(initBlock);
-		Method objCtor = module.getKlass(Object.class).getMethods("<init>").iterator().next();
-		initBlock.instructions().add(new CallInst(objCtor));
-		initBlock.instructions().add(new ReturnInst(module.types().getVoidType()));
-
-		Method implClinit = new Method("<clinit>", module.types().getMethodType("()V"), EnumSet.of(Modifier.STATIC), impl);
-		BasicBlock clinit = new BasicBlock(module);
-		implClinit.basicBlocks().add(clinit);
-		Field trampoline = module.getKlass(getClass()).getField("TRAMPOLINE");
-		Method mapRemove = module.getKlass(Map.class).getMethod("remove", module.types().getMethodType(Object.class, Map.class, Object.class));
-		Method invokeExact = module.getKlass(MethodHandle.class).getMethod("invokeExact", module.types().getMethodType(Object.class, MethodHandle.class, Object[].class));
-		for (Method m : k.methods()) {
-			if (m.isConstructor()) continue;
-			Field handleField = new Field(module.types().getRegularType(MethodHandle.class), m.getName()+"$impl",
-					EnumSet.of(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL), impl);
-			LoadInst getstatic = new LoadInst(trampoline);
-			String key = m.getName()+UUID.randomUUID().toString();
-			TRAMPOLINE.put(key, impls.get(m));
-			CallInst remove = new CallInst(mapRemove, getstatic, module.constants().getConstant(key));
-			CastInst cast = new CastInst(module.types().getType(MethodHandle.class), remove);
-			StoreInst putstatic = new StoreInst(handleField, cast);
-			clinit.instructions().addAll(Arrays.asList(getstatic, remove, cast, putstatic));
-
-			Method n = new Method(m.getName(),
-					m.getType().dropFirstArgument().prependArgument(module.types().getRegularType(impl)),
-					EnumSet.of(Modifier.PUBLIC, Modifier.FINAL), impl);
-			BasicBlock block = new BasicBlock(module);
-			n.basicBlocks().add(block);
-			LoadInst getHandle = new LoadInst(handleField);
-			Value[] invokeArgs = n.arguments().stream().toArray(Value[]::new);
-			//replace the (unused) this arg with the handle
-			invokeArgs[0] = getHandle;
-			edu.mit.streamjit.util.bytecode.types.MethodType desc = n.getType().dropFirstArgument().prependArgument(module.types().getRegularType(MethodHandle.class));
-			CallInst invoke = new CallInst(invokeExact, desc, invokeArgs);
-			//TODO: allow passing void value to return (just ignore it)
-			ReturnInst ret = invoke.getType() instanceof VoidType ?
-					new ReturnInst(invoke.getType()) :
-					new ReturnInst(invoke.getType(), invoke);
-			block.instructions().addAll(Arrays.asList(getHandle, invoke, ret));
-		}
-		clinit.instructions().add(new ReturnInst(module.types().getVoidType()));
+		Klass impl = makeImplClass(k, impls);
 
 		ModuleClassLoader mcl = new ModuleClassLoader(module);
 		try {
@@ -323,6 +274,59 @@ public final class Compiler {
 
 		for (Expr d : e.deps())
 			foldMultiplyTranspose(d);
+	}
+
+	private Klass makeImplClass(Klass k, Map<Method, MethodHandle> impls) {
+		Klass impl = new Klass("asdfasdf", module.getKlass(Object.class), k.interfaces(), module);
+		impl.modifiers().add(Modifier.PUBLIC);
+		impl.modifiers().add(Modifier.FINAL);
+		//TODO: no-op default constructors should be a bytecodelib utility method
+		Method init = new Method("<init>",
+				module.types().getMethodType(module.types().getType(impl)),
+				EnumSet.of(Modifier.PUBLIC),
+				impl);
+		BasicBlock initBlock = new BasicBlock(module);
+		init.basicBlocks().add(initBlock);
+		Method objCtor = module.getKlass(Object.class).getMethods("<init>").iterator().next();
+		initBlock.instructions().add(new CallInst(objCtor));
+		initBlock.instructions().add(new ReturnInst(module.types().getVoidType()));
+		Method implClinit = new Method("<clinit>", module.types().getMethodType("()V"), EnumSet.of(Modifier.STATIC), impl);
+		BasicBlock clinit = new BasicBlock(module);
+		implClinit.basicBlocks().add(clinit);
+		Field trampoline = module.getKlass(getClass()).getField("TRAMPOLINE");
+		Method mapRemove = module.getKlass(Map.class).getMethod("remove", module.types().getMethodType(Object.class, Map.class, Object.class));
+		Method invokeExact = module.getKlass(MethodHandle.class).getMethod("invokeExact", module.types().getMethodType(Object.class, MethodHandle.class, Object[].class));
+		for (Method m : k.methods()) {
+			if (m.isConstructor()) continue;
+			Field handleField = new Field(module.types().getRegularType(MethodHandle.class), m.getName()+"$impl",
+					EnumSet.of(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL), impl);
+			LoadInst getstatic = new LoadInst(trampoline);
+			String key = m.getName()+UUID.randomUUID().toString();
+			TRAMPOLINE.put(key, impls.get(m));
+			CallInst remove = new CallInst(mapRemove, getstatic, module.constants().getConstant(key));
+			CastInst cast = new CastInst(module.types().getType(MethodHandle.class), remove);
+			StoreInst putstatic = new StoreInst(handleField, cast);
+			clinit.instructions().addAll(Arrays.asList(getstatic, remove, cast, putstatic));
+
+			Method n = new Method(m.getName(),
+					m.getType().dropFirstArgument().prependArgument(module.types().getRegularType(impl)),
+					EnumSet.of(Modifier.PUBLIC, Modifier.FINAL), impl);
+			BasicBlock block = new BasicBlock(module);
+			n.basicBlocks().add(block);
+			LoadInst getHandle = new LoadInst(handleField);
+			Value[] invokeArgs = n.arguments().stream().toArray(Value[]::new);
+			//replace the (unused) this arg with the handle
+			invokeArgs[0] = getHandle;
+			edu.mit.streamjit.util.bytecode.types.MethodType desc = n.getType().dropFirstArgument().prependArgument(module.types().getRegularType(MethodHandle.class));
+			CallInst invoke = new CallInst(invokeExact, desc, invokeArgs);
+			//TODO: allow passing void value to return (just ignore it)
+			ReturnInst ret = invoke.getType() instanceof VoidType ?
+					new ReturnInst(invoke.getType()) :
+					new ReturnInst(invoke.getType(), invoke);
+			block.instructions().addAll(Arrays.asList(getHandle, invoke, ret));
+		}
+		clinit.instructions().add(new ReturnInst(module.types().getVoidType()));
+		return impl;
 	}
 
 	private static void print(Expr e, int indentLevel) {
