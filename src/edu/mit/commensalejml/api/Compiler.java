@@ -113,7 +113,7 @@ public final class Compiler {
 		Map<Method, MethodHandle> impls = new HashMap<>();
 		for (Method m : k.methods()) {
 			if (m.isConstructor()) continue;
-			Result result = buildIR(m);
+			ExpressionDAG result = buildIR(m);
 			System.out.println(m.getName());
 			result.roots().forEachOrdered(Compiler::foldMultiplyTranspose);
 			impls.put(m, new GreedyCodegen(stateHolder, fieldMap, m, result, tempFreelist).codegen());
@@ -241,7 +241,7 @@ public final class Compiler {
 		}
 	}
 
-	private Result buildIR(Method m) {
+	private ExpressionDAG buildIR(Method m) {
 		Map<Value, Expr> exprs = new IdentityHashMap<>();
 		Map<Field, Input> fieldInputs = new IdentityHashMap<>();
 		//strictly speaking, multiple blocks okay if all terminators are jump/ret
@@ -300,7 +300,7 @@ public final class Compiler {
 			} else
 				throw new UnsupportedOperationException(i.toString());
 		}
-		return new Result(fieldInputs, sets, ret);
+		return new ExpressionDAG(fieldInputs, sets, ret);
 	}
 
 	private static void foldMultiplyTranspose(Expr e) {

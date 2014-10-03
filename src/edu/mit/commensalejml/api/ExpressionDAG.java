@@ -18,11 +18,11 @@ import java.util.stream.Stream;
  * @author Jeffrey Bosboom <jbosboom@csail.mit.edu>
  * @since 10/3/2014
  */
-public final class Result {
+public final class ExpressionDAG {
 	public final Map<Field, Input> inputs;
 	public final BiMap<Field, Expr> sets;
 	public final Expr ret;
-	Result(Map<Field, Input> inputs, BiMap<Field, Expr> sets, Expr ret) {
+	ExpressionDAG(Map<Field, Input> inputs, BiMap<Field, Expr> sets, Expr ret) {
 		this.inputs = inputs;
 		this.sets = sets;
 		this.ret = ret;

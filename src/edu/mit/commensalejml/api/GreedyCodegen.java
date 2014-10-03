@@ -40,7 +40,7 @@ final class GreedyCodegen {
 	private final Object stateHolder;
 	private final Map<Value, Field> fieldMap;
 	private final Method method;
-	private final Result result;
+	private final ExpressionDAG result;
 	private final Map<Expr, MethodHandle> ready = new LinkedHashMap<>();
 	private final Set<Expr> worklist = new LinkedHashSet<>();
 	//the number of "leases" on temporary matrices
@@ -50,7 +50,7 @@ final class GreedyCodegen {
 	private final Map<Input, MethodHandle> deferredFieldSets = new LinkedHashMap<>();
 	private MethodHandle deferredRet = null;
 
-	GreedyCodegen(Object stateHolder, Map<Value, Field> fieldMap, Method method, Result result, Map<MatrixDimension, Deque<MethodHandle>> tempFreelist) {
+	GreedyCodegen(Object stateHolder, Map<Value, Field> fieldMap, Method method, ExpressionDAG result, Map<MatrixDimension, Deque<MethodHandle>> tempFreelist) {
 		this.stateHolder = stateHolder;
 		this.fieldMap = fieldMap;
 		this.method = method;
