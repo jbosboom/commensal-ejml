@@ -242,9 +242,7 @@ public final class Compiler {
 				m.toggleTransposeRight();
 			}
 		}
-
-		for (Expr d : e.deps())
-			foldMultiplyTranspose(d);
+		e.deps().forEach(Compiler::foldMultiplyTranspose);
 	}
 
 	private Klass makeImplClass(Klass k, Map<Method, MethodHandle> impls) {
