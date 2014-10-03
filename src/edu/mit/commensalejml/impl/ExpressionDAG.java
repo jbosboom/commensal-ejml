@@ -1,8 +1,6 @@
 package edu.mit.commensalejml.impl;
 
 import com.google.common.collect.BiMap;
-import edu.mit.commensalejml.impl.Expr;
-import edu.mit.commensalejml.impl.Input;
 import edu.mit.streamjit.util.bytecode.Field;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
