@@ -94,8 +94,8 @@ public final class Compiler {
 
 	private void makeStateHolder(Klass k, Object[] ctorArgs) {
 		TypeFactory types = module.types();
-		Klass stateHolderKlass = new Klass("StateHolder", module.getKlass(Object.class), ImmutableList.<Klass>of(), module);
-		stateHolderKlass.setAccess(Access.PUBLIC);
+		Klass stateHolderKlass = new Klass("StateHolder", module.getKlass(Object.class), ImmutableList.<Klass>of(),
+				EnumSet.of(Modifier.PUBLIC, Modifier.FINAL), module);
 		for (Field f : k.fields()) {
 			if (f.isStatic()) continue;
 			if (f.getType().getFieldType().getKlass() != simpleMatrix)
@@ -247,9 +247,8 @@ public final class Compiler {
 	}
 
 	private Klass makeImplClass(Klass k, Map<Method, MethodHandle> impls) {
-		Klass impl = new Klass("asdfasdf", module.getKlass(Object.class), k.interfaces(), module);
-		impl.modifiers().add(Modifier.PUBLIC);
-		impl.modifiers().add(Modifier.FINAL);
+		Klass impl = new Klass("asdfasdf", module.getKlass(Object.class), k.interfaces(),
+				EnumSet.of(Modifier.PUBLIC, Modifier.FINAL), module);
 		Methods.createDefaultConstructor(impl);
 		Method implClinit = new Method("<clinit>", module.types().getMethodType("()V"), EnumSet.of(Modifier.STATIC), impl);
 		BasicBlock clinit = new BasicBlock(module);
