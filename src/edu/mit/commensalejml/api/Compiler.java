@@ -106,21 +106,9 @@ public final class Compiler {
 		Klass k = module.getKlass(c);
 		for (Method m : k.methods())
 			m.resolve();
-//		k.dump(System.out);
 
 		makeStateHolder(k, ctorArgs);
-		stateHolderKlass.dump(System.out);
-
-		Map<MatrixDimension, Deque<MethodHandle>> tempFreelist = new LinkedHashMap<>();
-		Map<Method, MethodHandle> impls = new HashMap<>();
-		for (Method m : k.methods()) {
-			if (m.isConstructor()) continue;
-			ExpressionDAG result = buildIR(m);
-			System.out.println(m.getName());
-			result.roots().forEachOrdered(Compiler::foldMultiplyTranspose);
-			impls.put(m, new GreedyCodegen(stateHolder, fieldMap, m, result, tempFreelist).codegen());
-		}
-
+		Map<Method, MethodHandle> impls = makeImplHandles(k);
 		Klass impl = makeImplClass(k, impls);
 
 		ModuleClassLoader mcl = new ModuleClassLoader(module);
@@ -192,6 +180,19 @@ public final class Compiler {
 		} catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
 			throw new AssertionError(ex);
 		}
+	}
+
+	private Map<Method, MethodHandle> makeImplHandles(Klass k) {
+		Map<MatrixDimension, Deque<MethodHandle>> tempFreelist = new LinkedHashMap<>();
+		Map<Method, MethodHandle> impls = new HashMap<>();
+		for (Method m : k.methods()) {
+			if (m.isConstructor()) continue;
+			ExpressionDAG result = buildIR(m);
+			System.out.println(m.getName());
+			result.roots().forEachOrdered(Compiler::foldMultiplyTranspose);
+			impls.put(m, new GreedyCodegen(stateHolder, fieldMap, m, result, tempFreelist).codegen());
+		}
+		return impls;
 	}
 
 	private ExpressionDAG buildIR(Method m) {
