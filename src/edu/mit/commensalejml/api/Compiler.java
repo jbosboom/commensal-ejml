@@ -90,7 +90,6 @@ public final class Compiler {
 	private final ModuleClassLoader loader = new ModuleClassLoader(module);
 	private final Klass simpleMatrix = module.getKlass(SimpleMatrix.class);
 	private final Klass denseMatrix = module.getKlass(DenseMatrix64F.class);
-	private Klass stateHolderKlass;
 	private Object stateHolder;
 	/**
 	 * Maps fields and arguments in the original class to fields in the state
@@ -121,7 +120,7 @@ public final class Compiler {
 
 	private void makeStateHolder(Klass k, Object[] ctorArgs) {
 		TypeFactory types = module.types();
-		stateHolderKlass = new Klass("StateHolder", module.getKlass(Object.class), ImmutableList.<Klass>of(), module);
+		Klass stateHolderKlass = new Klass("StateHolder", module.getKlass(Object.class), ImmutableList.<Klass>of(), module);
 		stateHolderKlass.setAccess(Access.PUBLIC);
 		for (Field f : k.fields()) {
 			if (f.isStatic()) continue;
