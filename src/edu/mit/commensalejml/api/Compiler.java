@@ -256,7 +256,7 @@ public final class Compiler {
 		implClinit.basicBlocks().add(clinit);
 		Field trampoline = module.getKlass(getClass()).getField("TRAMPOLINE");
 		Method mapRemove = module.getKlass(Map.class).getMethod("remove", module.types().getMethodType(Object.class, Map.class, Object.class));
-		Method invokeExact = module.getKlass(MethodHandle.class).getMethod("invokeExact", module.types().getMethodType(Object.class, MethodHandle.class, Object[].class));
+
 		for (Method m : k.methods()) {
 			if (m.isConstructor()) continue;
 			Field handleField = new Field(module.types().getRegularType(MethodHandle.class), m.getName()+"$impl",
@@ -269,22 +269,7 @@ public final class Compiler {
 			StoreInst putstatic = new StoreInst(handleField, cast);
 			clinit.instructions().addAll(Arrays.asList(getstatic, remove, cast, putstatic));
 
-			Method n = new Method(m.getName(),
-					m.getType().dropFirstArgument().prependArgument(module.types().getRegularType(impl)),
-					EnumSet.of(Modifier.PUBLIC, Modifier.FINAL), impl);
-			BasicBlock block = new BasicBlock(module);
-			n.basicBlocks().add(block);
-			LoadInst getHandle = new LoadInst(handleField);
-			Value[] invokeArgs = n.arguments().stream().toArray(Value[]::new);
-			//replace the (unused) this arg with the handle
-			invokeArgs[0] = getHandle;
-			edu.mit.streamjit.util.bytecode.types.MethodType desc = n.getType().dropFirstArgument().prependArgument(module.types().getRegularType(MethodHandle.class));
-			CallInst invoke = new CallInst(invokeExact, desc, invokeArgs);
-			//TODO: allow passing void value to return (just ignore it)
-			ReturnInst ret = invoke.getType() instanceof VoidType ?
-					new ReturnInst(invoke.getType()) :
-					new ReturnInst(invoke.getType(), invoke);
-			block.instructions().addAll(Arrays.asList(getHandle, invoke, ret));
+			Methods.invokeExactFromField(impl, handleField, EnumSet.of(Modifier.PUBLIC, Modifier.FINAL), m.getName(), impls.get(m).type());
 		}
 		clinit.instructions().add(new ReturnInst(module.types().getVoidType()));
 		return impl;
