@@ -1,4 +1,4 @@
-package edu.mit.commensalejml.api;
+package edu.mit.commensalejml.impl;
 
 import com.google.common.collect.BiMap;
 import edu.mit.commensalejml.impl.Expr;
@@ -22,7 +22,7 @@ public final class ExpressionDAG {
 	public final Map<Field, Input> inputs;
 	public final BiMap<Field, Expr> sets;
 	public final Expr ret;
-	ExpressionDAG(Map<Field, Input> inputs, BiMap<Field, Expr> sets, Expr ret) {
+	public ExpressionDAG(Map<Field, Input> inputs, BiMap<Field, Expr> sets, Expr ret) {
 		this.inputs = inputs;
 		this.sets = sets;
 		this.ret = ret;

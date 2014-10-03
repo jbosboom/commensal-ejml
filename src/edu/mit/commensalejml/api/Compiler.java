@@ -1,5 +1,7 @@
 package edu.mit.commensalejml.api;
 
+import edu.mit.commensalejml.impl.GreedyCodegen;
+import edu.mit.commensalejml.impl.ExpressionDAG;
 import edu.mit.commensalejml.test.kalman.KalmanFilter;
 import edu.mit.commensalejml.test.kalman.KalmanFilterSimple;
 import static com.google.common.base.Preconditions.checkArgument;

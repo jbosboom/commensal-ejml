@@ -1,4 +1,4 @@
-package edu.mit.commensalejml.api;
+package edu.mit.commensalejml.impl;
 
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
@@ -35,7 +35,7 @@ import org.ejml.data.DenseMatrix64F;
  * @author Jeffrey Bosboom <jbosboom@csail.mit.edu>
  * @since 10/3/2014
  */
-final class GreedyCodegen {
+public final class GreedyCodegen {
 	private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
 	private final Object stateHolder;
 	private final Map<Value, Field> fieldMap;
@@ -50,7 +50,7 @@ final class GreedyCodegen {
 	private final Map<Input, MethodHandle> deferredFieldSets = new LinkedHashMap<>();
 	private MethodHandle deferredRet = null;
 
-	GreedyCodegen(Object stateHolder, Map<Value, Field> fieldMap, Method method, ExpressionDAG result, Map<MatrixDimension, Deque<MethodHandle>> tempFreelist) {
+	public GreedyCodegen(Object stateHolder, Map<Value, Field> fieldMap, Method method, ExpressionDAG result, Map<MatrixDimension, Deque<MethodHandle>> tempFreelist) {
 		this.stateHolder = stateHolder;
 		this.fieldMap = fieldMap;
 		this.method = method;
