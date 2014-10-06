@@ -53,7 +53,7 @@ public final class Multiply extends Expr {
 		setTransposeRight(!isTransposeRight());
 	}
 
-	private static MethodHandle MULT = lookup(CommonOps.class, "mult", 3),
+	private static final MethodHandle MULT = lookup(CommonOps.class, "mult", 3),
 			MULT_TRANS_L = lookup(CommonOps.class, "multTransA", 3),
 			MULT_TRANS_R = lookup(CommonOps.class, "multTransB", 3),
 			MULT_TRANS_LR = lookup(CommonOps.class, "multTransAB", 3);
