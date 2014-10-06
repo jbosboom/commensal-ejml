@@ -24,18 +24,6 @@ public final class Multiply extends Expr {
 		return new Multiply(left, false, right, false);
 	}
 
-	public static Multiply transposeLeft(Expr left, Expr right) {
-		return new Multiply(left, true, right, false);
-	}
-
-	public static Multiply transposeRight(Expr left, Expr right) {
-		return new Multiply(left, false, right, true);
-	}
-
-	public static Multiply transposeBoth(Expr left, Expr right) {
-		return new Multiply(left, true, right, true);
-	}
-
 	@Override
 	public int rows() {
 		return transposeLeft ? deps().get(0).cols() : deps().get(0).rows();
