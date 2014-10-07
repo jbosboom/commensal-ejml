@@ -10,6 +10,7 @@ import edu.mit.streamjit.util.bytecode.Argument;
 import edu.mit.streamjit.util.bytecode.Field;
 import edu.mit.streamjit.util.bytecode.Method;
 import edu.mit.streamjit.util.bytecode.Value;
+import edu.mit.streamjit.util.bytecode.methodhandles.Combinators;
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.findVirtual;
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.params;
 import java.lang.invoke.MethodHandle;
@@ -105,7 +106,7 @@ public final class GreedyCodegen {
 		}
 		assert deferredFieldSets.isEmpty() : deferredFieldSets;
 
-		MethodHandle opsHandle = MethodHandleUtils.semicolon(ops);
+		MethodHandle opsHandle = Combinators.semicolon(ops);
 		MethodHandle withArgs = opsHandle;
 		for (Argument a : FluentIterable.from(method.arguments()).skip(1)) {
 			Field f = fieldMap.get(a);

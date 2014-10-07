@@ -1,7 +1,6 @@
 package edu.mit.commensalejml.impl;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
+import edu.mit.streamjit.util.bytecode.methodhandles.Combinators;
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.findStatic;
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.params;
 import java.lang.invoke.MethodHandle;
@@ -63,6 +62,6 @@ public final class Multiply extends Expr {
 		MethodHandle handle = isTransposeLeft() ?
 				(isTransposeRight() ? MULT_TRANS_LR : MULT_TRANS_L) :
 				(isTransposeRight() ? MULT_TRANS_R : MULT);
-		return MethodHandleUtils.apply(handle, Iterables.concat(sources, ImmutableList.of(sink)));
+		return Combinators.apply(handle, sources.get(0), sources.get(1), sink);
 	}
 }

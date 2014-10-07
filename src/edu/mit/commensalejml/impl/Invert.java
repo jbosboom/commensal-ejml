@@ -1,7 +1,6 @@
 package edu.mit.commensalejml.impl;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
+import edu.mit.streamjit.util.bytecode.methodhandles.Combinators;
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.findStatic;
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.params;
 import java.lang.invoke.MethodHandle;
@@ -40,8 +39,8 @@ public final class Invert extends Expr {
 			INVERT_INPLACE = INVERT_INPLACE_.asType(INVERT_INPLACE_.type().changeReturnType(void.class));
 	@Override
 	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
-		if (sources.get(0) == sink)
-			return MethodHandleUtils.apply(INVERT_INPLACE, sink);
-		return MethodHandleUtils.apply(INVERT, Iterables.concat(sources, ImmutableList.of(sink)));
+		return sources.get(0) == sink ?
+				Combinators.apply(INVERT_INPLACE, sink) :
+				Combinators.apply(INVERT, sources.get(0), sink);
 	}
 }

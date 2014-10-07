@@ -2,7 +2,7 @@ package edu.mit.commensalejml.impl;
 
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.findStatic;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
+import edu.mit.streamjit.util.bytecode.methodhandles.Combinators;
 import java.lang.invoke.MethodHandle;
 import java.util.List;
 import org.ejml.ops.CommonOps;
@@ -36,8 +36,8 @@ public final class Minus extends Expr {
 			SUB_EQUALS = findStatic(CommonOps.class, "subEquals");
 	@Override
 	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
-		if (sources.get(0) == sink)
-			return MethodHandleUtils.apply(SUB_EQUALS, sources.get(0), sources.get(1));
-		return MethodHandleUtils.apply(SUB, Iterables.concat(sources, ImmutableList.of(sink)));
+		return sources.get(0) == sink ?
+				Combinators.apply(SUB_EQUALS, sources.get(0), sources.get(1)) :
+				Combinators.apply(SUB, sources.get(0), sources.get(1), sink);
 	}
 }

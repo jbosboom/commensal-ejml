@@ -1,7 +1,6 @@
 package edu.mit.commensalejml.impl;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
+import edu.mit.streamjit.util.bytecode.methodhandles.Combinators;
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.findStatic;
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.params;
 import java.lang.invoke.MethodHandle;
@@ -31,6 +30,6 @@ public final class Transpose extends Expr {
 	private static final MethodHandle TRANSPOSE = findStatic(CommonOps.class, "transpose", params(2));
 	@Override
 	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
-		return MethodHandleUtils.apply(TRANSPOSE, Iterables.concat(sources, ImmutableList.of(sink)));
+		return Combinators.apply(TRANSPOSE, sources.get(0), sink);
 	}
 }

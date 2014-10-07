@@ -1,7 +1,6 @@
 package edu.mit.commensalejml.impl;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
+import edu.mit.streamjit.util.bytecode.methodhandles.Combinators;
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.findStatic;
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.noPrimParam;
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.params;
@@ -41,9 +40,9 @@ public final class Plus extends Expr {
 	@Override
 	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
 		if (sources.get(0) == sink)
-			return MethodHandleUtils.apply(ADD_EQUALS, sources.get(0), sources.get(1));
+			return Combinators.apply(ADD_EQUALS, sources.get(0), sources.get(1));
 		else if (sources.get(1) == sink)
-			return MethodHandleUtils.apply(ADD_EQUALS, sources.get(1), sources.get(0));
-		return MethodHandleUtils.apply(ADD, Iterables.concat(sources, ImmutableList.of(sink)));
+			return Combinators.apply(ADD_EQUALS, sources.get(1), sources.get(0));
+		return Combinators.apply(ADD, sources.get(0), sources.get(1), sink);
 	}
 }
