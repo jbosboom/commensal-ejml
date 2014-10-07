@@ -2,6 +2,9 @@ package edu.mit.commensalejml.impl;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.findStatic;
+import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.noPrimParam;
+import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.params;
 import java.lang.invoke.MethodHandle;
 import java.util.Collections;
 import java.util.List;
@@ -33,8 +36,8 @@ public final class Plus extends Expr {
 		return Collections.unmodifiableList(deps());
 	}
 
-	private static final MethodHandle ADD = MethodHandleUtils.lookup(CommonOps.class, "add", 3);
-	private static final MethodHandle ADD_EQUALS = MethodHandleUtils.lookup(CommonOps.class, "addEquals", 2);
+	private static final MethodHandle ADD = findStatic(CommonOps.class, "add", params(3).and(noPrimParam())),
+			ADD_EQUALS = findStatic(CommonOps.class, "addEquals", params(2));
 	@Override
 	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
 		if (sources.get(0) == sink)

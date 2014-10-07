@@ -1,5 +1,6 @@
 package edu.mit.commensalejml.impl;
 
+import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.findStatic;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import java.lang.invoke.MethodHandle;
@@ -31,8 +32,8 @@ public final class Minus extends Expr {
 		return ImmutableList.of(deps().get(0));
 	}
 
-	private static final MethodHandle SUB = MethodHandleUtils.lookup(CommonOps.class, "sub", 3);
-	private static final MethodHandle SUB_EQUALS = MethodHandleUtils.lookup(CommonOps.class, "subEquals", 2);
+	private static final MethodHandle SUB = findStatic(CommonOps.class, "sub"),
+			SUB_EQUALS = findStatic(CommonOps.class, "subEquals");
 	@Override
 	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
 		if (sources.get(0) == sink)

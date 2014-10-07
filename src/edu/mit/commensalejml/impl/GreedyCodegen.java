@@ -10,6 +10,8 @@ import edu.mit.streamjit.util.bytecode.Argument;
 import edu.mit.streamjit.util.bytecode.Field;
 import edu.mit.streamjit.util.bytecode.Method;
 import edu.mit.streamjit.util.bytecode.Value;
+import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.findVirtual;
+import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.params;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -220,7 +222,7 @@ public final class GreedyCodegen {
 		}
 		return setOps;
 	}
-	private final MethodHandle SET_ = MethodHandleUtils.lookup(D1Matrix64F.class, "set", 1);
+	private final MethodHandle SET_ = findVirtual(D1Matrix64F.class, "set", params(1));
 	private final MethodHandle SET = SET_.asType(MethodType.methodType(void.class, DenseMatrix64F.class, DenseMatrix64F.class));
 
 	private MethodHandle setField(Field field, MethodHandle source) {

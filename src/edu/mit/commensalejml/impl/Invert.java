@@ -2,6 +2,8 @@ package edu.mit.commensalejml.impl;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.findStatic;
+import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.params;
 import java.lang.invoke.MethodHandle;
 import java.util.Collections;
 import java.util.List;
@@ -32,9 +34,9 @@ public final class Invert extends Expr {
 		return Collections.unmodifiableList(deps());
 	}
 
-	private static final MethodHandle INVERT_ = MethodHandleUtils.lookup(CommonOps.class, "invert", 2),
+	private static final MethodHandle INVERT_ = findStatic(CommonOps.class, "invert", params(2)),
 			INVERT = INVERT_.asType(INVERT_.type().changeReturnType(void.class)),
-			INVERT_INPLACE_ = MethodHandleUtils.lookup(CommonOps.class, "invert", 1),
+			INVERT_INPLACE_ = findStatic(CommonOps.class, "invert", params(1)),
 			INVERT_INPLACE = INVERT_INPLACE_.asType(INVERT_INPLACE_.type().changeReturnType(void.class));
 	@Override
 	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {

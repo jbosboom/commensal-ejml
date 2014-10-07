@@ -2,7 +2,8 @@ package edu.mit.commensalejml.impl;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import static edu.mit.commensalejml.impl.MethodHandleUtils.lookup;
+import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.findStatic;
+import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.params;
 import java.lang.invoke.MethodHandle;
 import java.util.List;
 import org.ejml.ops.CommonOps;
@@ -53,10 +54,10 @@ public final class Multiply extends Expr {
 		setTransposeRight(!isTransposeRight());
 	}
 
-	private static final MethodHandle MULT = lookup(CommonOps.class, "mult", 3),
-			MULT_TRANS_L = lookup(CommonOps.class, "multTransA", 3),
-			MULT_TRANS_R = lookup(CommonOps.class, "multTransB", 3),
-			MULT_TRANS_LR = lookup(CommonOps.class, "multTransAB", 3);
+	private static final MethodHandle MULT = findStatic(CommonOps.class, "mult", params(3)),
+			MULT_TRANS_L = findStatic(CommonOps.class, "multTransA", params(3)),
+			MULT_TRANS_R = findStatic(CommonOps.class, "multTransB", params(3)),
+			MULT_TRANS_LR = findStatic(CommonOps.class, "multTransAB", params(3));
 	@Override
 	public MethodHandle operate(List<MethodHandle> sources, MethodHandle sink) {
 		MethodHandle handle = isTransposeLeft() ?
