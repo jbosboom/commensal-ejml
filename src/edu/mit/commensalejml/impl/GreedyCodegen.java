@@ -121,10 +121,9 @@ public final class GreedyCodegen {
 	}
 
 	private void prepare(Expr e) {
-		if (e instanceof Input) {
-			if (!ready.containsKey(e))
-				ready.put(e, makeFieldGetter(((Input)e).getField()));
-		} else
+		if (e instanceof Input)
+			ready.put(e, makeFieldGetter(((Input)e).getField()));
+		else
 			worklist.add(e);
 		e.deps().forEach(d -> remainingUses.put(d, e));
 		e.deps().forEach(this::prepare);
