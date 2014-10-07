@@ -105,12 +105,9 @@ public final class GreedyCodegen {
 		}
 		assert deferredFieldSets.isEmpty() : deferredFieldSets;
 
-		MethodHandle opsHandle = Combinators.semicolon(ops);
-		MethodHandle withArgs = opsHandle;
-		for (Argument a : FluentIterable.from(method.arguments()).skip(1)) {
-			Field f = fieldMap.get(a);
-			withArgs = MethodHandles.collectArguments(withArgs, withArgs.type().parameterCount(), makeFieldSetter(f));
-		}
+		MethodHandle withArgs = Combinators.semicolon(ops);
+		for (Argument a : FluentIterable.from(method.arguments()).skip(1))
+			withArgs = MethodHandles.collectArguments(withArgs, withArgs.type().parameterCount(), makeFieldSetter(fieldMap.get(a)));
 
 		if (deferredRet != null) {
 			withArgs = MethodHandles.filterReturnValue(withArgs, deferredRet);
