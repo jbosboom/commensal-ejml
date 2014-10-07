@@ -131,29 +131,12 @@ public final class GreedyCodegen {
 	}
 
 	private Expr popNext() {
-		//			List<Expr> possibleNext = new ArrayList<>();
 		for (Expr e : worklist)
 			if (ready.keySet().containsAll(e.deps())) {
 				worklist.remove(e);
 				return e;
 			}
 		throw new AssertionError("nothing with all deps ready");
-		//					possibleNext.add(e);
-		//			Collections.sort(possibleNext, new Comparator<Expr>() {
-		//				@Override
-		//				public int compare(Expr left, Expr right) {
-		//					List<Integer> leftDepsRank = new ArrayList<>(),
-		//							rightDepsRank = new ArrayList<>();
-		//					for (Expr e : left.deps())
-		//						leftDepsRank.add(ready.indexOf(e));
-		//					for (Expr e : right.deps())
-		//						rightDepsRank.add(ready.indexOf(e));
-		//					Collections.sort(leftDepsRank);
-		//					Collections.sort(rightDepsRank);
-		//					return Ordering.<Integer>natural().lexicographical().compare(leftDepsRank, rightDepsRank);
-		//				}
-		//			});
-		//			return possibleNext.get(0);
 	}
 
 	private MethodHandle source(Expr e) {
@@ -168,10 +151,10 @@ public final class GreedyCodegen {
 	 * Despite intuition, sinks are getter handles, not setters.
 	 */
 	private MethodHandle sink(Expr e) {
-		//			//Field outputs should go direct if we don't still need the
-		//			//corresponding input.
-		//			//TODO: I guess we'd want some lookahead to see if going direct is
-		//			//possible early, to set up an inplace operation targeting the output.
+		//Field outputs should go direct if we don't still need the
+		//corresponding input.
+		//TODO: I guess we'd want some lookahead to see if going direct is
+		//possible early, to set up an inplace operation targeting the output.
 		Field output = result.sets.inverse().get(e);
 		Input input = result.inputs.get(output);
 		if (output != null && remainingUses.get(input).isEmpty())
