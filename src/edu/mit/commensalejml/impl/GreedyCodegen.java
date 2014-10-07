@@ -26,6 +26,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import static java.util.stream.Collectors.toList;
 import org.ejml.data.D1Matrix64F;
 import org.ejml.data.DenseMatrix64F;
 
@@ -63,9 +64,7 @@ public final class GreedyCodegen {
 		while (!worklist.isEmpty()) {
 			Expr next = popNext();
 
-			List<MethodHandle> sources = new ArrayList<>();
-			for (Expr d : next.deps())
-				sources.add(source(d));
+			List<MethodHandle> sources = next.deps().stream().map(this::source).collect(toList());
 
 			//inplace sources are now free
 			next.inplacePlaces().stream().forEachOrdered((d) -> remainingUses.get(d).remove(next));
@@ -127,10 +126,8 @@ public final class GreedyCodegen {
 				ready.put(e, makeFieldGetter(((Input)e).getField()));
 		} else
 			worklist.add(e);
-		for (Expr d : e.deps())
-			remainingUses.put(d, e);
-		for (Expr d : e.deps())
-			prepare(d);
+		e.deps().forEach(d -> remainingUses.put(d, e));
+		e.deps().forEach(this::prepare);
 	}
 
 	private Expr popNext() {
