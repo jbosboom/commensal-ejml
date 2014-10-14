@@ -17,6 +17,7 @@
  */
 package edu.mit.commensalejml.test.kalman;
 
+import edu.mit.commensalejml.api.Compiler;
 import org.ejml.data.DenseMatrix64F;
 import org.ejml.ops.CommonOps;
 import java.util.ArrayList;
@@ -127,11 +128,13 @@ public class BenchmarkKalmanPerformance {
 		DenseMatrix64F F = createF(T);
 		DenseMatrix64F Q = createQ(T, 0.1);
 		DenseMatrix64F H = createH();
-//		benchmark.filters.add(new edu.mit.commensalejml.api.Compiler().compile(KalmanFilter.class, KalmanFilterSimple.class,
-//				F, Q, H, new DenseMatrix64F(9, 1), new DenseMatrix64F(9, 9)));
-		benchmark.filters.add(new KalmanFilterOperations(F, Q, H));
-//		benchmark.filters.add(new KalmanFilterSimple(F, Q, H, new DenseMatrix64F(9, 1), new DenseMatrix64F(9, 9)));
-//		benchmark.filters.add(new KalmanFilterEquation());
+		if (args[0].equals("simple"))
+			benchmark.filters.add(new KalmanFilterSimple(F, Q, H, new DenseMatrix64F(9, 1), new DenseMatrix64F(9, 9)));
+		if (args[0].equals("ops"))
+			benchmark.filters.add(new KalmanFilterOperations(F, Q, H));
+		if (args[0].equals("commensal"))
+			benchmark.filters.add(new Compiler().compile(KalmanFilter.class, KalmanFilterSimple.class,
+				F, Q, H, new DenseMatrix64F(9, 1), new DenseMatrix64F(9, 9)));
 		for (int i = 0; i < 10; ++i)
 			benchmark.run();
 	}
