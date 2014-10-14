@@ -35,6 +35,7 @@ import edu.mit.streamjit.util.bytecode.insts.Instruction;
 import edu.mit.streamjit.util.bytecode.insts.LoadInst;
 import edu.mit.streamjit.util.bytecode.insts.ReturnInst;
 import edu.mit.streamjit.util.bytecode.insts.StoreInst;
+import edu.mit.streamjit.util.bytecode.methodhandles.ProxyFactory;
 import edu.mit.streamjit.util.bytecode.types.TypeFactory;
 import edu.mit.streamjit.util.bytecode.types.VoidType;
 import java.lang.invoke.MethodHandle;
@@ -80,15 +81,8 @@ public final class Compiler {
 			m.resolve();
 
 		makeStateHolder(k, ctorArgs);
-		Map<Method, MethodHandle> impls = makeImplHandles(k);
-		Klass impl = makeImplClass(k, impls);
-
-		ModuleClassLoader mcl = new ModuleClassLoader(module);
-		try {
-			return iface.cast(mcl.loadClass(impl.getName()).newInstance());
-		} catch (ClassNotFoundException | InstantiationException | IllegalAccessException ex) {
-			throw new RuntimeException(ex);
-		}
+		Map<String, MethodHandle> impls = makeImplHandles(k);
+		return new ProxyFactory(loader).createProxy("asdfasdf", impls, iface);
 	}
 
 	private void makeStateHolder(Klass k, Object[] ctorArgs) {
@@ -153,15 +147,15 @@ public final class Compiler {
 		}
 	}
 
-	private Map<Method, MethodHandle> makeImplHandles(Klass k) {
+	private Map<String, MethodHandle> makeImplHandles(Klass k) {
 		Map<MatrixDimension, Deque<MethodHandle>> tempFreelist = new LinkedHashMap<>();
-		Map<Method, MethodHandle> impls = new HashMap<>();
+		Map<String, MethodHandle> impls = new HashMap<>();
 		for (Method m : k.methods()) {
 			if (m.isConstructor()) continue;
 			ExpressionDAG result = buildIR(m);
 			System.out.println(m.getName());
 			result.roots().forEachOrdered(Compiler::foldMultiplyTranspose);
-			impls.put(m, new GreedyCodegen(stateHolder, fieldMap, m, result, tempFreelist).codegen());
+			impls.put(m.getName(), new GreedyCodegen(stateHolder, fieldMap, m, result, tempFreelist).codegen());
 		}
 		return impls;
 	}
