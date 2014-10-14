@@ -11,6 +11,7 @@ import edu.mit.streamjit.util.bytecode.Field;
 import edu.mit.streamjit.util.bytecode.Method;
 import edu.mit.streamjit.util.bytecode.Value;
 import edu.mit.streamjit.util.bytecode.methodhandles.Combinators;
+import edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils;
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.findVirtual;
 import static edu.mit.streamjit.util.bytecode.methodhandles.LookupUtils.params;
 import java.lang.invoke.MethodHandle;
@@ -207,26 +208,17 @@ public final class GreedyCodegen {
 		MethodHandle set = MethodHandles.collectArguments(SET, 0, sink);
 		return MethodHandles.collectArguments(set, 0, source);
 	}
-	private final Map<Field, MethodHandle> fieldGetterCache = new IdentityHashMap<>();
 
+	private final Map<Field, MethodHandle> fieldGetterCache = new IdentityHashMap<>();
 	private MethodHandle makeFieldGetter(Field f) {
 		//TODO: if we know the Input's matrix (i.e., not an arg), should we
 		//make a constant handle instead?
-		return fieldGetterCache.computeIfAbsent(f, (Field f_) -> {
-			try {
-				return LOOKUP.findGetter(stateHolder.getClass(), f_.getName(), DenseMatrix64F.class).bindTo(stateHolder);
-			} catch (NoSuchFieldException | IllegalAccessException ex) {
-				throw new AssertionError(ex);
-			}
-		});
+		return fieldGetterCache.computeIfAbsent(f, (Field f_) ->
+				LookupUtils.findGetter(stateHolder.getClass(), f_.getName(), DenseMatrix64F.class).bindTo(stateHolder));
 	}
 
 	private MethodHandle makeFieldSetter(Field f) {
-		try {
-			return LOOKUP.findSetter(stateHolder.getClass(), f.getName(), DenseMatrix64F.class).bindTo(stateHolder);
-		} catch (NoSuchFieldException | IllegalAccessException ex) {
-			throw new AssertionError(ex);
-		}
+		return LookupUtils.findSetter(stateHolder.getClass(), f.getName(), DenseMatrix64F.class).bindTo(stateHolder);
 	}
 
 }
