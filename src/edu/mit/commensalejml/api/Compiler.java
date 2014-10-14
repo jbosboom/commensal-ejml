@@ -49,6 +49,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import org.ejml.data.DenseMatrix64F;
 import org.ejml.simple.SimpleMatrix;
 
@@ -58,8 +59,6 @@ import org.ejml.simple.SimpleMatrix;
  * @since 7/6/2014
  */
 public final class Compiler {
-	//for initializing static fields in newly-spun classes
-	public static final Map<String, MethodHandle> TRAMPOLINE = new ConcurrentHashMap<>();
 	private final Module module = new Module();
 	private final ModuleClassLoader loader = new ModuleClassLoader(module);
 	private final Klass simpleMatrix = module.getKlass(SimpleMatrix.class);
@@ -250,27 +249,16 @@ public final class Compiler {
 		Klass impl = new Klass("asdfasdf", module.getKlass(Object.class), k.interfaces(),
 				EnumSet.of(Modifier.PUBLIC, Modifier.FINAL), module);
 		Methods.createDefaultConstructor(impl);
-		Method implClinit = new Method("<clinit>", module.types().getMethodType("()V"), EnumSet.of(Modifier.STATIC), impl);
-		BasicBlock clinit = new BasicBlock(module);
-		implClinit.basicBlocks().add(clinit);
-		Field trampoline = module.getKlass(getClass()).getField("TRAMPOLINE");
-		Method mapRemove = module.getKlass(Map.class).getMethod("remove", module.types().getMethodType(Object.class, Map.class, Object.class));
 
+		Map<String, MethodHandle> handleFields = k.methods().stream()
+				.filter(m -> !m.isConstructor())
+				.collect(Collectors.toMap(m -> m.getName()+"$impl", impls::get));
+		Methods.staticFinalFieldInitializer(impl, handleFields);
 		for (Method m : k.methods()) {
 			if (m.isConstructor()) continue;
-			Field handleField = new Field(module.types().getRegularType(MethodHandle.class), m.getName()+"$impl",
-					EnumSet.of(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL), impl);
-			LoadInst getstatic = new LoadInst(trampoline);
-			String key = m.getName()+UUID.randomUUID().toString();
-			TRAMPOLINE.put(key, impls.get(m));
-			CallInst remove = new CallInst(mapRemove, getstatic, module.constants().getConstant(key));
-			CastInst cast = new CastInst(module.types().getType(MethodHandle.class), remove);
-			StoreInst putstatic = new StoreInst(handleField, cast);
-			clinit.instructions().addAll(Arrays.asList(getstatic, remove, cast, putstatic));
-
-			Methods.invokeExactFromField(impl, handleField, EnumSet.of(Modifier.PUBLIC, Modifier.FINAL), m.getName(), impls.get(m).type());
+			Methods.invokeExactFromField(impl, impl.getField(m.getName()+"$impl"),
+					EnumSet.of(Modifier.PUBLIC, Modifier.FINAL), m.getName(), impls.get(m).type());
 		}
-		clinit.instructions().add(new ReturnInst(module.types().getVoidType()));
 		return impl;
 	}
 
