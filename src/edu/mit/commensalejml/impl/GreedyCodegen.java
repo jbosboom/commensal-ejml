@@ -37,7 +37,6 @@ import org.ejml.data.DenseMatrix64F;
  * @since 10/3/2014
  */
 public final class GreedyCodegen {
-	private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
 	private final Object stateHolder;
 	private final Map<Value, Field> fieldMap;
 	private final Method method;
