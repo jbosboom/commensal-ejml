@@ -71,8 +71,7 @@ public final class Compiler {
 		checkArgument(iface.isInterface(), "%s not an interface", iface);
 		checkArgument(iface.isAssignableFrom(c), "%s does not implement %s", iface, c);
 		Klass k = module.getKlass(c);
-		for (Method m : k.methods())
-			m.resolve();
+		k.methods().forEach(Method::resolve);
 
 		makeStateHolder(k, ctorArgs);
 		Map<String, MethodHandle> impls = makeImplHandles(k);
