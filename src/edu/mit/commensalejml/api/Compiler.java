@@ -239,23 +239,6 @@ public final class Compiler {
 		e.deps().forEach(Compiler::foldMultiplyTranspose);
 	}
 
-	private Klass makeImplClass(Klass k, Map<Method, MethodHandle> impls) {
-		Klass impl = new Klass("asdfasdf", module.getKlass(Object.class), k.interfaces(),
-				EnumSet.of(Modifier.PUBLIC, Modifier.FINAL), module);
-		Methods.createDefaultConstructor(impl);
-
-		Map<String, MethodHandle> handleFields = k.methods().stream()
-				.filter(m -> !m.isConstructor())
-				.collect(Collectors.toMap(m -> m.getName()+"$impl", impls::get));
-		Methods.staticFinalFieldInitializer(impl, handleFields);
-		for (Method m : k.methods()) {
-			if (m.isConstructor()) continue;
-			Methods.invokeExactFromField(impl, impl.getField(m.getName()+"$impl"),
-					EnumSet.of(Modifier.PUBLIC, Modifier.FINAL), m.getName(), impls.get(m).type());
-		}
-		return impl;
-	}
-
 	private static void print(Expr e, int indentLevel) {
 		for (int i = 0; i < indentLevel; ++i)
 			System.out.print("  ");
