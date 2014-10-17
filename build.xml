@@ -100,15 +100,26 @@ xmlns:if="ant:if" xmlns:unless="ant:unless"
 	<target name="jar" depends="compile">
 		<mkdir dir="build/jar"/>
 		<jar destfile="build/jar/commensal-ejml.jar" basedir="build/classes">
-<!--			<manifest>
-				<attribute name="Main-Class" value="${main-class}"/>
-			</manifest>-->
+			<manifest>
+				<attribute name="Main-Class" value="edu.mit.commensalejml.test.kalman.BenchmarkKalmanPerformance"/>
+			</manifest>
 		</jar>
 	</target>
 
-<!--	<target name="run" depends="jar">
-		<java jar="${jar.dir}/${ant.project.name}.jar" fork="true"/>
-	</target>-->
+	<target name="run" depends="jar">
+		<fail unless="impl" message="pass -Dimpl={simple,ops,commensal}"/>
+		<java classname="edu.mit.commensalejml.test.kalman.BenchmarkKalmanPerformance" fork="true">
+			<classpath>
+				<fileset dir="lib">
+					<include name="*.jar"/>
+				</fileset>
+				<fileset dir="build/jar">
+					<include name="*.jar"/>
+				</fileset>
+			</classpath>
+			<arg value="${impl}"/>
+		</java>
+	</target>
 
 	<target name="clean-build" depends="clean,jar"/>
 </project>
