@@ -21,12 +21,45 @@
  * THE SOFTWARE.
  */
 -->
-<project name="commensal-ejml" basedir="." default="jar">
+<project name="commensal-ejml" basedir="." default="jar"
+xmlns:if="ant:if" xmlns:unless="ant:unless"
+>
 	<target name="fetch">
-		<copy todir="lib">
-			<fileset dir="../bytecodelib/lib"/>
-		</copy>
-		<copy file="../bytecodelib/build/jar/bytecodelib.jar" todir="lib/"/>
+		<mkdir dir="lib"/>
+		<mkdir dir="lib/doc"/>
+		<mkdir dir="lib/src"/>
+
+		<!-- use a local bytecodelib jar if available -->
+		<copy file="../bytecodelib/build/jar/bytecodelib.jar"
+			  tofile="lib/bytecodelib.jar"
+			  failonerror="false" quiet="true" />
+
+		<!-- the asm download needs to be unpacked, so skipexisting isn't
+			 enough to prevent executing it repeatedly -->
+		<condition property="getasm">
+			<not>
+				<and>
+					<available file="lib/asm.jar"/>
+					<available file="lib/doc/asm-doc.jar"/>
+					<available file="lib/src/asm-src.zip"/>
+				</and>
+			</not>
+		</condition>
+		<sequential if:true="${getasm}">
+			<get src="http://download.forge.ow2.org/asm/asm-5.0.3-bin.zip"
+				 dest="lib/asm-5.0.3-bin.zip"/>
+			<unzip src="lib/asm-5.0.3-bin.zip" dest="lib"/>
+			<copy file="lib/asm-5.0.3/lib/all/asm-debug-all-5.0.3.jar"
+				  tofile="lib/asm.jar"/>
+			<copy file="lib/asm-5.0.3/src.zip" tofile="lib/src/asm-src.zip"/>
+			<jar basedir="lib/asm-5.0.3/doc/javadoc/user" destfile="lib/doc/asm-doc.jar"/>
+			<delete dir="lib/asm-5.0.3"/>
+			<delete file="lib/asm-5.0.3-bin.zip"/>
+		</sequential>
+
+		<get src="https://github.com/jbosboom/bytecodelib/releases/download/20141017/bytecodelib.jar"
+			 dest="lib/bytecodelib.jar"
+			 skipexisting="true"/>
 
 		<get src="http://search.maven.org/remotecontent?filepath=com/googlecode/efficient-java-matrix-library/ejml/0.25/ejml-0.25.jar"
 			 dest="lib/ejml.jar"
@@ -36,6 +69,16 @@
 			 skipexisting="true"/>
 		<get src="http://search.maven.org/remotecontent?filepath=com/googlecode/efficient-java-matrix-library/ejml/0.25/ejml-0.25-sources.jar"
 			 dest="lib/src/ejml-src.jar"
+			 skipexisting="true"/>
+
+		<get src="http://search.maven.org/remotecontent?filepath=com/google/guava/guava/18.0/guava-18.0.jar"
+			 dest="lib/guava.jar"
+			 skipexisting="true"/>
+		<get src="http://search.maven.org/remotecontent?filepath=com/google/guava/guava/18.0/guava-18.0-javadoc.jar"
+			 dest="lib/doc/guava-doc.jar"
+			 skipexisting="true"/>
+		<get src="http://search.maven.org/remotecontent?filepath=com/google/guava/guava/18.0/guava-18.0-sources.jar"
+			 dest="lib/src/guava-src.jar"
 			 skipexisting="true"/>
 	</target>
 
