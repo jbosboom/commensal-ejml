@@ -10,7 +10,7 @@ included with EJML).
 To learn more about commensal compliation, see [StreamJIT: A Commensal
 Compiler for High-Performance Stream Programming](http://groups.csail.mit.edu/commit/papers/2014/bosboom-oopsla14-commensal.pdf),
 published in OOPSLA 2014.  (This compiler is not described in the paper,
-but was featured in the talk.)
+but was featured in the talk [(slides)](http://groups.csail.mit.edu/commit/papers/2014/bosboom-oopsla14-commensal-slides.pdf).)
 
 Building
 --------
